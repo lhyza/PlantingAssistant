@@ -7,18 +7,7 @@
 - 技术栈：Flutter 3.50 / Dart 3.14 + SQLite（sqflite）+ 本地通知
 - 最新安装包：**1.5.0**（versionCode 6，[下载](#下载)）
 - 仓库源码快照：**1.4.0**（versionCode 5，数据库 schema v8，数据文件 schemaVersion 4）
-- 特点：**没有 INTERNET 权限**，所有数据只存在手机上，不登录、不联网、不上传
-
----
-
-## 下载
-
-- [GitHub Releases · v1.5.0](https://github.com/lhyza/PlantingAssistant/releases/tag/v1.5.0)
-- 直接下载：[PlantingAssistant-1.5.0-release.apk](https://github.com/lhyza/PlantingAssistant/releases/download/v1.5.0/PlantingAssistant-1.5.0-release.apk)
-- 大小：62,555,705 字节（约 59.7 MB）
-- SHA-256：`1ebd848a4c3ece6e368452b65bcdfb64e38a8e0962041b2a41901715d945b581`
-
-> 1.5.0 安装包的数据格式标识是 `caomeiyuan.data`；下面源码快照 1.4.0 使用 `planting.data`，两边的 JSON 导出文件不能直接互导。
+- 特点：所有数据只存在手机上。
 
 ---
 
@@ -75,22 +64,8 @@ flutter analyze                 # 应为 0 error
 flutter build apk --release     # 产物：build/app/outputs/flutter-apk/app-release.apk
 ```
 
-### 关于签名
-
-`app/android/app/build.gradle.kts` 会读取 `app/android/key.properties`（**未随源码提供**）：
-
-```properties
-storePassword=你的库密码
-keyPassword=你的key密码
-keyAlias=你的alias
-storeFile=相对路径或绝对路径/release.jks
-```
-
-没有这个文件时，构建会自动退回到 **debug 签名**，`flutter run` 和本地调试完全不受影响；只有要发布 release 包、且希望**覆盖升级旧版本**时，才必须使用同一把 `.jks`。
-
 ## 数据与隐私
 
-- App 不申请网络权限，Android 系统层面就无法联网（可用 `aapt2 dump permissions` 验证）。
 - 数据存于 App 私有目录：`files/planting.db`（SQLite）+ `files/images/`（照片）。
 - 卸载即清空。**备份方式**：App 内「我的 → 数据管理 → 全部导出」，可导出 7 份 JSON（图片以 base64 内嵌），换机后用「导入」还原。
 - 内置知识库只是文本资料，不含任何账号、接口或第三方服务信息。
