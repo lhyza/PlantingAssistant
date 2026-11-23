@@ -414,7 +414,7 @@ class _PestDetailPageState extends State<PestDetailPage> {
               Pill(
                 x.crops.isEmpty
                     ? '通用'
-                    : '影响 ${x.cropsText(crops.map((c) => c.name).toList())}',
+                    : '影响 ${x.cropsText({for (final c in crops) c.id: c.name})}',
                 bg: kBlueBg,
                 fg: kBlue,
               ),

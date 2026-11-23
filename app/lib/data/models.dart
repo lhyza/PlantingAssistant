@@ -227,12 +227,13 @@ class Pest {
   }
 
   /// 「通用」或作物名用「、」连接。
-  String cropsText(List<String> names) {
+  ///
+  /// [nameById] 是「作物 id → 作物名」的映射；crops 里存的是 id，
+  /// 所以必须按 id 查名字，不能拿 id 去名字数组里 indexOf（历史 bug：
+  /// 会直接显示成 crop_strawberry）。查不到就原样输出，兼容历史中文名。
+  String cropsText(Map<String, String> nameById) {
     if (crop == '通用' || crops.isEmpty) return '通用';
-    return crops.map((id) {
-      final i = names.indexOf(id);
-      return i >= 0 ? names[i] : id;
-    }).join('、');
+    return crops.map((v) => nameById[v] ?? v).join('、');
   }
 
   String symptoms;

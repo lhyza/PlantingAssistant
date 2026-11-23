@@ -2,18 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../core/changelog.dart';
 import '../core/theme.dart';
+import '../core/version.dart';
 import '../data/notify.dart';
 import '../data/repo.dart';
+import '../data/update_controller.dart';
 import 'common.dart';
 import 'crop_manage.dart';
 import 'data_manage.dart';
 import 'stage_manage.dart';
-
-const kAppName = '种植助手';
-const kBuildStamp = '2026-11-23 09:45';
-const kAppVersion = '1.4.0';
-const kVersionCode = 5;
-const kDataSchema = 4;
+import 'update_page.dart';
 
 class MePage extends StatefulWidget {
   const MePage({super.key});
@@ -145,6 +142,21 @@ class _MePageState extends State<MePage> {
           ]),
           const SizedBox(height: 14),
           _group('其它', [
+            _tile(
+              Icons.system_update_alt,
+              '版本更新',
+              UpdateController.instance.hasUpdate
+                  ? '有新版本 ${UpdateController.instance.info!.version}'
+                  : '当前 $kAppVersion (${kVersionCode})',
+              () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UpdatePage(autoCheck: true)),
+                );
+                await _load();
+              },
+              dot: UpdateController.instance.unseen,
+            ),
             _tile(Icons.info_outline, '关于', kBuildStamp, () {
               Navigator.push(
                 context,
@@ -198,7 +210,8 @@ class _MePageState extends State<MePage> {
     );
   }
 
-  Widget _tile(IconData icon, String title, String sub, VoidCallback onTap) {
+  Widget _tile(IconData icon, String title, String sub, VoidCallback onTap,
+      {bool dot = false}) {
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -223,6 +236,13 @@ class _MePageState extends State<MePage> {
                 ],
               ),
             ),
+            if (dot)
+              Container(
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: const BoxDecoration(color: kRed, shape: BoxShape.circle),
+              ),
             const Icon(Icons.chevron_right, size: 18, color: kInk3),
           ],
         ),

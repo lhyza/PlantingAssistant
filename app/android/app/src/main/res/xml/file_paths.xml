@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 应用内更新下载的 APK 放在外部私有目录 updates/ 下，通过 FileProvider 交给系统安装器 -->
+<paths>
+    <external-files-path name="updates" path="updates/" />
+    <files-path name="internal_updates" path="updates/" />
+</paths>

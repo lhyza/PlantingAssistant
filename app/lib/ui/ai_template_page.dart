@@ -9,6 +9,7 @@ import '../data/ai_import.dart';
 import '../data/ai_prompt.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import 'ai_preview_page.dart';
 import 'common.dart';
 
 /// AI 模板页：选作物 → 贴链接 → 生成提示词 → 复制给 AI → 回来导入 zip。
@@ -82,23 +83,48 @@ class _AiTemplatePageState extends State<AiTemplatePage> {
   Future<void> _import() async {
     final picked = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['zip'],
+      allowedExtensions: const ['zip', 'json'],
     );
     if (picked == null || picked.isEmpty) return;
     final f = picked.first;
     final bytes = await f.readAsBytes();
     if (!mounted) return;
     setState(() => busy = true);
-    final res = await importAiPack(bytes: bytes, cropId: cropId);
+    final plan = await previewAiData(
+      bytes: bytes,
+      cropId: cropId,
+      expectedKind: kind,
+      fileName: f.name,
+    );
     if (!mounted) return;
     setState(() => busy = false);
 
-    if (!res.ok) {
-      await showDialog<void>(
+    if (!plan.ok) {
+      await _errorDialog('${plan.error}\n\n$kAiPackHint');
+      return;
+    }
+    if (plan.importable == 0) {
+      await _errorDialog(
+        '这个文件里没有可导入的条目。\n\n'
+        '新增 ${plan.addCount} · 更新 ${plan.updateCount} · '
+        '合并 ${plan.mergeCount} · 跳过 ${plan.skipCount}',
+      );
+      return;
+    }
+    final res = await Navigator.push<AiImportResult>(
+      context,
+      MaterialPageRoute(builder: (_) => AiPreviewPage(plan: plan)),
+    );
+    if (res == null || !mounted) return;
+    await _resultDialog(res);
+    if (mounted) Navigator.pop(context, true);
+  }
+
+  Future<void> _errorDialog(String msg) => showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('导入失败'),
-          content: Text('${res.error}\n\n$kAiPackHint'),
+          content: SingleChildScrollView(child: Text(msg)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -107,35 +133,32 @@ class _AiTemplatePageState extends State<AiTemplatePage> {
           ],
         ),
       );
-      return;
-    }
 
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('导入完成'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${aiKindName(res.kind)} · ${res.cropName}'),
-            const SizedBox(height: 8),
-            Text('新增 ${res.added} 条，更新 ${res.updated} 条'),
-            if (res.skipped > 0) Text('跳过 ${res.skipped} 条（没有名称）'),
-            if (res.images > 0)
-              Text('保存了 ${res.images} 张图片，列表里带「!」的点开可以裁剪'),
+  Future<void> _resultDialog(AiImportResult res) => showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('导入完成'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${aiKindName(res.kind)} · ${res.cropName}'),
+              const SizedBox(height: 8),
+              Text('新增 ${res.added} 条 · 更新 ${res.updated} 条 · 合并 ${res.merged} 条'),
+              if (res.skipped > 0) Text('跳过 ${res.skipped} 条'),
+              if (res.failed > 0) Text('失败 ${res.failed} 条'),
+              if (res.pending > 0)
+                Text('保存了 ${res.images} 张图片，列表里带「!」的点开可以裁剪'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('好'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('好'),
-          ),
-        ],
-      ),
-    );
-    if (mounted) Navigator.pop(context, true);
-  }
+      );
 
   @override
   Widget build(BuildContext context) {

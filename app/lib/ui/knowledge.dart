@@ -7,6 +7,7 @@ import '../data/ai_import.dart';
 import '../data/ai_prompt.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import 'ai_preview_page.dart';
 import 'ai_template_page.dart';
 import 'common.dart';
 import 'image_crop.dart';
@@ -250,7 +251,7 @@ class _KnowledgePageState extends State<KnowledgePage>
               _load();
             },
           ),
-          tags: [p.crops.isEmpty ? '通用' : '影响 ${p.cropsText(crops.map((c) => c.name).toList())}'],
+          tags: [p.crops.isEmpty ? '通用' : '影响 ${p.cropsText({for (final c in crops) c.id: c.name})}'],
           note: p.symptoms,
           incomplete: p.incomplete,
           onTap: () async {
@@ -369,20 +370,45 @@ class _KnowledgePageState extends State<KnowledgePage>
   Future<void> _importAi(String kind) async {
     final picked = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['zip'],
+      allowedExtensions: const ['zip', 'json'],
     );
     if (picked == null || picked.isEmpty) return;
-    final bytes = await picked.first.readAsBytes();
-    final res = await importAiPack(bytes: bytes, cropId: cropId);
+    final f = picked.first;
+    final bytes = await f.readAsBytes();
     if (!mounted) return;
-    if (!res.ok) {
-      await showDialog<void>(
+    final plan = await previewAiData(
+      bytes: bytes,
+      cropId: cropId,
+      expectedKind: kind,
+      fileName: f.name,
+    );
+    if (!mounted) return;
+    if (!plan.ok) {
+      await _errorDialog('${plan.error}\n\n$kAiPackHint');
+      return;
+    }
+    if (plan.importable == 0) {
+      await _errorDialog(
+        '这个文件里没有可导入的条目。\n\n'
+        '新增 ${plan.addCount} · 更新 ${plan.updateCount} · '
+        '合并 ${plan.mergeCount} · 跳过 ${plan.skipCount}',
+      );
+      return;
+    }
+    final res = await Navigator.push<AiImportResult>(
+      context,
+      MaterialPageRoute(builder: (_) => AiPreviewPage(plan: plan)),
+    );
+    if (res == null || !mounted) return;
+    await _resultDialog(res);
+    _load();
+  }
+
+  Future<void> _errorDialog(String msg) => showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('导入失败'),
-          content: SingleChildScrollView(
-            child: Text('${res.error}\n\n${kAiPackHint}'),
-          ),
+          content: SingleChildScrollView(child: Text(msg)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -391,30 +417,29 @@ class _KnowledgePageState extends State<KnowledgePage>
           ],
         ),
       );
-      return;
-    }
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('导入完成'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${aiKindName(res.kind)} · ${res.cropName}'),
-            const SizedBox(height: 8),
-            Text('新增 ${res.added} 条，更新 ${res.updated} 条'),
-            if (res.images > 0)
-              Text('保存了 ${res.images} 张图片，带「!」的点缩略图可以裁剪'),
+
+  Future<void> _resultDialog(AiImportResult res) => showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('导入完成'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${aiKindName(res.kind)} · ${res.cropName}'),
+              const SizedBox(height: 8),
+              Text('新增 ${res.added} 条 · 更新 ${res.updated} 条 · 合并 ${res.merged} 条'),
+              if (res.skipped > 0) Text('跳过 ${res.skipped} 条'),
+              if (res.failed > 0) Text('失败 ${res.failed} 条'),
+              if (res.pending > 0)
+                Text('保存了 ${res.images} 张图片，带「!」的点缩略图可以裁剪'),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('好')),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('好')),
-        ],
-      ),
-    );
-    _load();
-  }
+      );
 
   void _openEdit(int tab, String? id, {String kind = 'fertilizer'}) {
     Navigator.push(

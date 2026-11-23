@@ -5,9 +5,11 @@ import '../core/util.dart';
 import '../data/models.dart';
 import '../data/reminder_group.dart';
 import '../data/repo.dart';
+import '../data/update_controller.dart';
 import 'app_state.dart';
 import 'batch_detail.dart';
 import 'reminder_sheet.dart';
+import 'update_page.dart';
 
 class TodayPage extends StatefulWidget {
   const TodayPage({super.key});
@@ -90,6 +92,60 @@ class _TodayPageState extends State<TodayPage> {
   }).toList();
 
   @override
+  Widget _updateBanner() {
+    final c = UpdateController.instance;
+    final v = c.info?.version ?? '';
+    final ready = c.readyToInstall;
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const UpdatePage()),
+        );
+        if (mounted) setState(() {});
+      },
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+        decoration: BoxDecoration(
+          color: kAmberBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kAmber.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            const Text('✨', style: TextStyle(fontSize: 18)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    ready ? '更新已下载，点这里安装' : '有新版本 $v 可以更新',
+                    style: tBody.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    ready ? '安装包已校验通过（版本 $v）' : '点这里查看更新内容并安装',
+                    style: tTiny,
+                  ),
+                ],
+              ),
+            ),
+            if (!ready)
+              TextButton(
+                onPressed: () async {
+                  await c.markSeen();
+                  if (mounted) setState(() {});
+                },
+                child: const Text('忽略'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget build(BuildContext context) {
     final now = DateTime.now();
     return SafeArea(
@@ -140,6 +196,11 @@ class _TodayPageState extends State<TodayPage> {
                   ),
               ],
             ),
+            if (UpdateController.instance.unseen ||
+                UpdateController.instance.readyToInstall) ...[
+              const SizedBox(height: 12),
+              _updateBanner(),
+            ],
             const SizedBox(height: 14),
             if (crops.isNotEmpty)
               SingleChildScrollView(

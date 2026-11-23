@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -5,6 +7,7 @@ import 'app.dart';
 import 'core/images.dart';
 import 'data/notify.dart';
 import 'data/repo.dart';
+import 'data/update_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +27,8 @@ Future<void> main() async {
   // 首次启动会建库并从 assets/seeds 灌入内置数据
   try {
     await Repo.instance.crops();
+    // 历史数据里的 pests.crops 可能存了中文作物名，归一成 id（幂等）
+    await Repo.instance.normalizePestCrops();
   } catch (e, st) {
     debugPrint('db init failed: $e\n$st');
   }
@@ -36,6 +41,9 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('notify init failed: $e');
   }
+
+  // 更新检查不阻塞启动：24 小时内只查一次，失败静默
+  unawaited(UpdateController.instance.syncOnStart());
 
   runApp(const PlantingApp());
 }

@@ -95,6 +95,36 @@ class Repo {
     return rows.map(Variety.fromMap).toList();
   }
 
+  /// 历史数据里 pests.crops 可能存的是中文作物名（早期迁移留下的），
+  /// 这里一次性归一成作物 id。幂等：没有可改的就直接返回 0。
+  Future<int> normalizePestCrops() async {
+    final cs = await crops(includeDisabled: true);
+    if (cs.isEmpty) return 0;
+    final byName = {for (final c in cs) c.name: c.id};
+    final d = await Db.instance.db;
+    final rows = await d.query('pests', columns: ['id', 'crops'],
+        where: 'deletedAt IS NULL');
+    var n = 0;
+    for (final r in rows) {
+      final raw = (r['crops'] as String?) ?? '';
+      if (raw.isEmpty) continue;
+      var s = raw;
+      var changed = false;
+      for (final e in byName.entries) {
+        final quoted = '"${e.key}"';
+        if (s.contains(quoted)) {
+          s = s.replaceAll(quoted, '"${e.value}"');
+          changed = true;
+        }
+      }
+      if (!changed) continue;
+      await d.update('pests', {'crops': s, 'updatedAt': nowStamp()},
+          where: 'id = ?', whereArgs: [r['id']]);
+      n++;
+    }
+    return n;
+  }
+
   Future<List<Pest>> pests(String cropId) async {
     final d = await _d;
     final rows = await d.query(

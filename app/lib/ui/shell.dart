@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/theme.dart';
+import '../data/update_controller.dart';
 import 'batch_list.dart';
 import 'knowledge.dart';
+import 'common.dart';
 import 'me.dart';
 import 'record_edit.dart';
 import 'today.dart';
@@ -17,8 +20,40 @@ class _ShellState extends State<Shell> {
   int _index = 0;
 
   @override
+  void initState() {
+    super.initState();
+    UpdateController.instance.addListener(_onUpdate);
+  }
+
+  @override
+  void dispose() {
+    UpdateController.instance.removeListener(_onUpdate);
+    super.dispose();
+  }
+
+  void _onUpdate() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _confirmExit() async {
+    final leave = await confirm(
+      context,
+      '更新还在下载',
+      body: '现在退出 App，下载会在通知栏继续；下载完成后回来点「安装」即可。',
+      ok: '仍然退出',
+    );
+    if (leave && mounted) SystemNavigator.pop();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !UpdateController.instance.downloading,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (UpdateController.instance.downloading) _confirmExit();
+      },
+      child: Scaffold(
       body: IndexedStack(
         index: _index,
         children: const [
@@ -74,6 +109,7 @@ class _ShellState extends State<Shell> {
             label: '我的',
           ),
         ],
+      ),
       ),
     );
   }
