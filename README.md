@@ -7,7 +7,8 @@
 - 技术栈：Flutter 3.50 / Dart 3.14 + SQLite（sqflite）+ 本地通知
 
 ---
-
+![界面参考1](https://github.com/lhyza/PlantingAssistant/blob/main/docs/images/app-mockup.png)
+![界面参考2](https://github.com/lhyza/PlantingAssistant/blob/main/docs/images/v14-mockup.png)
 ## 主要功能
 
 | 模块 | 能做什么 |
