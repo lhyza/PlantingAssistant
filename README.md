@@ -14,7 +14,7 @@
 ## 下载
 
 - [GitHub Releases · v1.5.0](https://github.com/lhyza/PlantingAssistant/releases/tag/v1.5.0)
-- 直接下载：[种植助手-1.5.0-release.apk](https://github.com/lhyza/PlantingAssistant/releases/download/v1.5.0/%E7%A7%8D%E6%A4%8D%E5%8A%A9%E6%89%8B-1.5.0-release.apk)
+- 直接下载：[PlantingAssistant-1.5.0-release.apk](https://github.com/lhyza/PlantingAssistant/releases/download/v1.5.0/PlantingAssistant-1.5.0-release.apk)
 - 大小：62,555,705 字节（约 59.7 MB）
 - SHA-256：`1ebd848a4c3ece6e368452b65bcdfb64e38a8e0962041b2a41901715d945b581`
 
