@@ -1,0 +1,14 @@
+{
+  "format": "planting.data",
+  "kind": "garden",
+  "schemaVersion": 2,
+  "libraryId": "lib_garden_8f21c3d4",
+  "name": "种植数据",
+  "updatedAt": "2026-11-20T11:30:00+08:00",
+  "revision": 9,
+  "appVersion": "1.0.1",
+  "count": 0,
+  "batches": [],
+  "records": [],
+  "reminders": []
+}

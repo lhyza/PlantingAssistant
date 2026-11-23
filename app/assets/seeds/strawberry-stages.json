@@ -1,0 +1,1224 @@
+{
+  "format": "planting.data",
+  "kind": "stage",
+  "schemaVersion": 2,
+  "libraryId": "lib_stage_7e10c5a3",
+  "name": "生产阶段库",
+  "updatedAt": "2026-11-20T11:30:00+08:00",
+  "revision": 2,
+  "appVersion": "1.0.1",
+  "count": 28,
+  "crops": [
+    {
+      "id": "crop_strawberry",
+      "name": "草莓",
+      "emoji": "🍓",
+      "color": "#E8354D",
+      "lifeCycle": "annual",
+      "cycleStart": "plantDate",
+      "unit": "盆",
+      "enabled": true,
+      "sortOrder": 1,
+      "isDefault": true
+    },
+    {
+      "id": "crop_lemon",
+      "name": "柠檬",
+      "emoji": "🍋",
+      "color": "#E8B23A",
+      "lifeCycle": "perennial",
+      "cycleStart": "03-01",
+      "unit": "株",
+      "enabled": true,
+      "sortOrder": 2
+    },
+    {
+      "id": "crop_grape",
+      "name": "葡萄",
+      "emoji": "🍇",
+      "color": "#8A63D2",
+      "lifeCycle": "perennial",
+      "cycleStart": "03-15",
+      "unit": "株",
+      "enabled": true,
+      "sortOrder": 3
+    },
+    {
+      "id": "crop_fig",
+      "name": "无花果",
+      "emoji": "🌿",
+      "color": "#0B8F63",
+      "lifeCycle": "perennial",
+      "cycleStart": "03-20",
+      "unit": "株",
+      "enabled": true,
+      "sortOrder": 4
+    }
+  ],
+  "items": [
+    {
+      "id": "crop_strawberry_s01",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "草莓",
+      "name": "苗前消毒",
+      "sortOrder": 1,
+      "startDay": -3,
+      "endDay": 0,
+      "color": "#647A8E",
+      "fertilizerPlan": "定植前不施肥，基质消毒即可。",
+      "pestControl": "土壤/基质消毒：暴晒 3 天，或用多菌灵 800 倍浇透。",
+      "operationTips": "定植前 3 天完成盆器清洗与基质消毒；准备好定植穴与缓苗遮阴网。",
+      "reminders": [
+        {
+          "id": "sr_strawberry_01_a",
+          "kind": "施药",
+          "title": "基质消毒（多菌灵 800 倍）",
+          "startOffset": 1,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "浇透基质，静置 2 天再用",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_strawberry_01_b",
+          "kind": "其他",
+          "title": "检查盆器与排水孔",
+          "startOffset": 2,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_strawberry_s02",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "草莓",
+      "name": "缓苗期",
+      "sortOrder": 2,
+      "startDay": 1,
+      "endDay": 7,
+      "color": "#A9744F",
+      "fertilizerPlan": "缓苗期不施肥，只浇清水，避免烧根。",
+      "pestControl": "观察叶片是否萎蔫、根颈是否发黑，预防根腐病。",
+      "operationTips": "遮阴 3 天，保持基质湿润但不积水；7 天后见新叶展开即为缓苗成功。",
+      "reminders": [
+        {
+          "id": "sr_strawberry_02_a",
+          "kind": "浇水",
+          "title": "缓苗期保湿浇水",
+          "startOffset": 1,
+          "intervalDays": 2,
+          "repeatCount": 3,
+          "notes": "见干见湿，不积水",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_strawberry_02_b",
+          "kind": "施药",
+          "title": "根腐病预防",
+          "startOffset": 4,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "甲霜灵 1000 倍灌根一次",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_strawberry_s03",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "草莓",
+      "name": "假植/蹲苗期",
+      "sortOrder": 3,
+      "startDay": 8,
+      "endDay": 15,
+      "color": "#C9A227",
+      "fertilizerPlan": "薄施一次平衡水溶肥（2000 倍），促根不促旺。",
+      "pestControl": "重点防蚜虫、红蜘蛛，检查叶背。",
+      "operationTips": "适当控水蹲苗，促发新根；发现蚜虫立即处理，避免扩散。",
+      "reminders": [
+        {
+          "id": "sr_strawberry_03_a",
+          "kind": "施肥",
+          "title": "平衡水溶肥 2000 倍",
+          "startOffset": 3,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "灌根，不要喷叶",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_strawberry_03_b",
+          "kind": "施药",
+          "title": "蚜虫/红蜘蛛检查与防治",
+          "startOffset": 6,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "重点看叶背",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_strawberry_s04",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "草莓",
+      "name": "营养生长期",
+      "sortOrder": 4,
+      "startDay": 16,
+      "endDay": 45,
+      "color": "#3E9B6B",
+      "fertilizerPlan": "每 10 天一次平衡水溶肥（1000–1500 倍），共 3 次。",
+      "pestControl": "每 15 天预防一次白粉病/灰霉病，共 2 次。",
+      "operationTips": "摘除老叶病叶，保证每天 6 小时以上光照；控氮防徒长，及时补钙。",
+      "reminders": [
+        {
+          "id": "sr_strawberry_04_a",
+          "kind": "施肥",
+          "title": "平衡水溶肥 1000–1500 倍",
+          "startOffset": 1,
+          "intervalDays": 10,
+          "repeatCount": 3,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_strawberry_04_b",
+          "kind": "施药",
+          "title": "白粉病/灰霉病预防",
+          "startOffset": 5,
+          "intervalDays": 15,
+          "repeatCount": 2,
+          "notes": "交替用药避免抗性",
+          "enabled": true,
+          "sortOrder": 2
+        },
+        {
+          "id": "sr_strawberry_04_c",
+          "kind": "其他",
+          "title": "摘老叶、整理株型",
+          "startOffset": 10,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "id": "crop_strawberry_s05",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "草莓",
+      "name": "催花/花芽分化期",
+      "sortOrder": 5,
+      "startDay": 46,
+      "endDay": 55,
+      "color": "#4A7FC0",
+      "fertilizerPlan": "高磷促花肥 1000 倍，7 天一次共 2 次；花前补一次平衡肥。",
+      "pestControl": "重点防白粉病，保持通风；必要时预防性喷 1 次。",
+      "operationTips": "控水增光，停氮增磷钾；夜温 10–15℃ 有利于花芽分化。",
+      "reminders": [
+        {
+          "id": "sr_strawberry_05_a",
+          "kind": "施肥",
+          "title": "高磷促花肥 1000 倍",
+          "startOffset": 1,
+          "intervalDays": 7,
+          "repeatCount": 2,
+          "notes": "花前追一次平衡肥，膨果期转高钾",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_strawberry_05_b",
+          "kind": "施药",
+          "title": "白粉病预防",
+          "startOffset": 3,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_strawberry_s06",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "草莓",
+      "name": "开花期",
+      "sortOrder": 6,
+      "startDay": 56,
+      "endDay": 75,
+      "color": "#D96A9A",
+      "fertilizerPlan": "控氮，补硼 + 高磷钾，7 天一次共 3 次。",
+      "pestControl": "花期避免乳油类药剂；重点防蓟马、灰霉病。",
+      "operationTips": "授粉：毛笔点花或小风扇轻吹；空气湿度控制在 60% 以下。",
+      "reminders": [
+        {
+          "id": "sr_strawberry_06_a",
+          "kind": "施肥",
+          "title": "高磷钾 + 硼肥",
+          "startOffset": 1,
+          "intervalDays": 7,
+          "repeatCount": 3,
+          "notes": "浓度宁稀勿浓",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_strawberry_06_b",
+          "kind": "施药",
+          "title": "灰霉病/蓟马防治",
+          "startOffset": 5,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "避开花朵开放时段",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_strawberry_s07",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "草莓",
+      "name": "幼果期",
+      "sortOrder": 7,
+      "startDay": 76,
+      "endDay": 90,
+      "color": "#E0862B",
+      "fertilizerPlan": "高钾水溶肥 7 天一次，共 2 次。",
+      "pestControl": "防灰霉病、白粉病；注意通风降湿。",
+      "operationTips": "疏果：每花序留 3–5 个果，去除畸形果与病果。",
+      "reminders": [
+        {
+          "id": "sr_strawberry_07_a",
+          "kind": "施肥",
+          "title": "高钾水溶肥 1000 倍",
+          "startOffset": 1,
+          "intervalDays": 7,
+          "repeatCount": 2,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_strawberry_07_b",
+          "kind": "其他",
+          "title": "疏果、垫果",
+          "startOffset": 6,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "用泡沫垫隔离果实与土面",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_strawberry_s08",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "草莓",
+      "name": "果实膨大期",
+      "sortOrder": 8,
+      "startDay": 91,
+      "endDay": 110,
+      "color": "#D9534F",
+      "fertilizerPlan": "高钾 + 钙镁，7 天一次共 3 次。",
+      "pestControl": "防红蜘蛛、蚜虫；保持通风，避免高湿。",
+      "operationTips": "均匀供水，忽干忽湿易裂果；及时摘除老叶改善通风。",
+      "reminders": [
+        {
+          "id": "sr_strawberry_08_a",
+          "kind": "施肥",
+          "title": "高钾 + 钙镁水溶肥",
+          "startOffset": 1,
+          "intervalDays": 7,
+          "repeatCount": 3,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_strawberry_08_b",
+          "kind": "施药",
+          "title": "红蜘蛛/蚜虫防治",
+          "startOffset": 5,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "重点喷叶背",
+          "enabled": true,
+          "sortOrder": 2
+        },
+        {
+          "id": "sr_strawberry_08_c",
+          "kind": "浇水",
+          "title": "稳定供水",
+          "startOffset": 1,
+          "intervalDays": 3,
+          "repeatCount": 7,
+          "notes": "少量多次，避免积水",
+          "enabled": true,
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "id": "crop_strawberry_s09",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "草莓",
+      "name": "着色成熟期",
+      "sortOrder": 9,
+      "startDay": 111,
+      "endDay": 125,
+      "color": "#8A63D2",
+      "fertilizerPlan": "停氮，补钾钙，10 天一次共 2 次。",
+      "pestControl": "重点防灰霉病，注意通风，避免果面结露。",
+      "operationTips": "控水提糖；果实垫起防烂；适当疏叶让果见光。",
+      "reminders": [
+        {
+          "id": "sr_strawberry_09_a",
+          "kind": "施肥",
+          "title": "钾钙肥 1500 倍",
+          "startOffset": 1,
+          "intervalDays": 10,
+          "repeatCount": 2,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_strawberry_09_b",
+          "kind": "施药",
+          "title": "灰霉病预防",
+          "startOffset": 4,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "采前 7 天停药",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_strawberry_s10",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "草莓",
+      "name": "采收期",
+      "sortOrder": 10,
+      "startDay": 126,
+      "endDay": 160,
+      "color": "#2A9D8F",
+      "fertilizerPlan": "每采一批追一次高钾肥，约 7–10 天一次。",
+      "pestControl": "采前 7 天停止用药；持续防灰霉与红蜘蛛。",
+      "operationTips": "早晨采收，采后尽快冷藏（0–2℃）；及时摘除老叶与匍匐茎。",
+      "reminders": [
+        {
+          "id": "sr_strawberry_10_a",
+          "kind": "施肥",
+          "title": "采后追施高钾肥",
+          "startOffset": 1,
+          "intervalDays": 7,
+          "repeatCount": 4,
+          "notes": "采一批追一次",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_strawberry_10_b",
+          "kind": "浇水",
+          "title": "采收期浇水",
+          "startOffset": 1,
+          "intervalDays": 3,
+          "repeatCount": 10,
+          "notes": "采前 1 天不浇水，提糖",
+          "enabled": true,
+          "sortOrder": 2
+        },
+        {
+          "id": "sr_strawberry_10_c",
+          "kind": "其他",
+          "title": "检查果实与病叶",
+          "startOffset": 2,
+          "intervalDays": 7,
+          "repeatCount": 5,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "id": "crop_lemon_s01",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "柠檬",
+      "name": "春梢萌发",
+      "sortOrder": 1,
+      "startDay": 0,
+      "endDay": 30,
+      "color": "#E8B23A",
+      "fertilizerPlan": "萌芽前施一次有机肥（羊粪/饼肥），新梢期不追氮。",
+      "pestControl": "重点防红蜘蛛、蚜虫；开春清园，剪除病枝。",
+      "operationTips": "修剪：剪除内向枝、病虫枝；保证每天 6 小时以上直射光。",
+      "reminders": [
+        {
+          "id": "sr_lemon_01_a",
+          "kind": "施肥",
+          "title": "萌芽前有机肥",
+          "startOffset": 1,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "沿盆边浅埋",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_lemon_01_b",
+          "kind": "施药",
+          "title": "开春清园（石硫合剂）",
+          "startOffset": 3,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "发芽前完成",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_lemon_s02",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "柠檬",
+      "name": "现蕾开花",
+      "sortOrder": 2,
+      "startDay": 31,
+      "endDay": 55,
+      "color": "#F0C96A",
+      "fertilizerPlan": "花期补硼 + 磷钾，10 天一次共 2 次；控氮。",
+      "pestControl": "防蓟马、灰霉；花期尽量不用乳油类药剂。",
+      "operationTips": "授粉：晴天上午轻摇花枝或用软毛笔点花；空气湿度 60–70%。",
+      "reminders": [
+        {
+          "id": "sr_lemon_02_a",
+          "kind": "施肥",
+          "title": "硼 + 磷钾",
+          "startOffset": 3,
+          "intervalDays": 10,
+          "repeatCount": 2,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_lemon_02_b",
+          "kind": "浇水",
+          "title": "花期稳定供水",
+          "startOffset": 1,
+          "intervalDays": 5,
+          "repeatCount": 5,
+          "notes": "忌忽干忽湿导致落花",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_lemon_s03",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "柠檬",
+      "name": "坐果/幼果期",
+      "sortOrder": 3,
+      "startDay": 56,
+      "endDay": 90,
+      "color": "#C9A227",
+      "fertilizerPlan": "高钾水溶肥 10 天一次共 3 次。",
+      "pestControl": "防红蜘蛛、蚜虫；注意通风，避免幼果感病。",
+      "operationTips": "疏果：每枝留 2–3 个果，摘除畸形果与过密果。",
+      "reminders": [
+        {
+          "id": "sr_lemon_03_a",
+          "kind": "施肥",
+          "title": "高钾水溶肥 1000 倍",
+          "startOffset": 1,
+          "intervalDays": 10,
+          "repeatCount": 3,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_lemon_03_b",
+          "kind": "其他",
+          "title": "疏果",
+          "startOffset": 10,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_lemon_s04",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "柠檬",
+      "name": "果实膨大",
+      "sortOrder": 4,
+      "startDay": 91,
+      "endDay": 150,
+      "color": "#D9A02B",
+      "fertilizerPlan": "高钾 + 钙镁，10 天一次共 5 次；保持土壤微酸。",
+      "pestControl": "防红蜘蛛、蚧壳虫；雨季防炭疽病。",
+      "operationTips": "均匀供水，积水易烂根；每月浇一次 0.2% 硫酸亚铁防黄化。",
+      "reminders": [
+        {
+          "id": "sr_lemon_04_a",
+          "kind": "施肥",
+          "title": "高钾 + 钙镁",
+          "startOffset": 1,
+          "intervalDays": 10,
+          "repeatCount": 5,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_lemon_04_b",
+          "kind": "浇水",
+          "title": "见干见湿",
+          "startOffset": 1,
+          "intervalDays": 4,
+          "repeatCount": 12,
+          "notes": "盆土表面 2cm 干了再浇",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_lemon_s05",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "柠檬",
+      "name": "转色成熟采收",
+      "sortOrder": 5,
+      "startDay": 151,
+      "endDay": 210,
+      "color": "#E8B23A",
+      "fertilizerPlan": "采前停氮，补钾；每采一批追一次薄肥。",
+      "pestControl": "采前 10 天停止用药；持续防红蜘蛛。",
+      "operationTips": "果皮由青转黄即可采；留果过久易落果、影响来年花芽。",
+      "reminders": [
+        {
+          "id": "sr_lemon_05_a",
+          "kind": "施肥",
+          "title": "采后薄施平衡肥",
+          "startOffset": 1,
+          "intervalDays": 15,
+          "repeatCount": 3,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_lemon_05_b",
+          "kind": "其他",
+          "title": "检查果实与病虫枝",
+          "startOffset": 5,
+          "intervalDays": 15,
+          "repeatCount": 4,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_lemon_s06",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "柠檬",
+      "name": "越冬休眠",
+      "sortOrder": 6,
+      "startDay": 211,
+      "endDay": 364,
+      "color": "#8A857F",
+      "fertilizerPlan": "冬季停肥或只施一次越冬有机肥。",
+      "pestControl": "清园：剪除病枝、落叶集中销毁；树干涂白防冻。",
+      "operationTips": "控水，盆土偏干；室温保持 0–10℃，避免暖气房高温催芽。",
+      "reminders": [
+        {
+          "id": "sr_lemon_06_a",
+          "kind": "施肥",
+          "title": "越冬有机肥",
+          "startOffset": 30,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_lemon_06_b",
+          "kind": "其他",
+          "title": "清园与防冻",
+          "startOffset": 60,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_grape_s01",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "葡萄",
+      "name": "萌芽期",
+      "sortOrder": 1,
+      "startDay": 0,
+      "endDay": 25,
+      "color": "#8A63D2",
+      "fertilizerPlan": "萌芽前施催芽肥（平衡型），萌芽后不追氮。",
+      "pestControl": "清园：刮除老翘皮，喷石硫合剂防黑痘病、螨类。",
+      "operationTips": "抹芽：保留壮芽，抹除双芽、弱芽；及时绑蔓。",
+      "reminders": [
+        {
+          "id": "sr_grape_01_a",
+          "kind": "施肥",
+          "title": "催芽肥",
+          "startOffset": 1,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_grape_01_b",
+          "kind": "施药",
+          "title": "清园（石硫合剂）",
+          "startOffset": 3,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "萌芽前完成",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_grape_s02",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "葡萄",
+      "name": "新梢展叶",
+      "sortOrder": 2,
+      "startDay": 26,
+      "endDay": 55,
+      "color": "#9B7BE0",
+      "fertilizerPlan": "新梢 20cm 后薄施平衡肥，10 天一次共 2 次。",
+      "pestControl": "防霜霉病、绿盲蝽；雨后及时喷保护性药剂。",
+      "operationTips": "摘心：结果枝留 8–10 叶摘心，副梢留 1–2 叶反复摘心。",
+      "reminders": [
+        {
+          "id": "sr_grape_02_a",
+          "kind": "施肥",
+          "title": "平衡水溶肥 1500 倍",
+          "startOffset": 10,
+          "intervalDays": 10,
+          "repeatCount": 2,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_grape_02_b",
+          "kind": "其他",
+          "title": "摘心与绑蔓",
+          "startOffset": 15,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_grape_s03",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "葡萄",
+      "name": "开花期",
+      "sortOrder": 3,
+      "startDay": 56,
+      "endDay": 70,
+      "color": "#C7A6E8",
+      "fertilizerPlan": "花期停肥停水，花前补硼。",
+      "pestControl": "花期避免喷药（影响授粉）；花前防灰霉。",
+      "operationTips": "花前 3 天摘心，控制徒长；晴天上午轻摇花穗辅助授粉。",
+      "reminders": [
+        {
+          "id": "sr_grape_03_a",
+          "kind": "施肥",
+          "title": "花前补硼",
+          "startOffset": 1,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "花前 5 天喷施",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_grape_03_b",
+          "kind": "其他",
+          "title": "花前摘心",
+          "startOffset": 3,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_grape_s04",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "葡萄",
+      "name": "坐果/膨大",
+      "sortOrder": 4,
+      "startDay": 71,
+      "endDay": 130,
+      "color": "#7C4DD8",
+      "fertilizerPlan": "膨果肥：高钾 7–10 天一次共 5 次，配钙肥。",
+      "pestControl": "重点防霜霉病、白粉病、红蜘蛛。",
+      "operationTips": "疏果：每穗留 40–60 粒，去除小粒、畸形粒；套袋防病虫与鸟害。",
+      "reminders": [
+        {
+          "id": "sr_grape_04_a",
+          "kind": "施肥",
+          "title": "高钾膨果肥",
+          "startOffset": 1,
+          "intervalDays": 8,
+          "repeatCount": 5,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_grape_04_b",
+          "kind": "施药",
+          "title": "霜霉病/白粉病预防",
+          "startOffset": 5,
+          "intervalDays": 12,
+          "repeatCount": 3,
+          "notes": "雨后补喷",
+          "enabled": true,
+          "sortOrder": 2
+        },
+        {
+          "id": "sr_grape_04_c",
+          "kind": "其他",
+          "title": "疏果套袋",
+          "startOffset": 10,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "id": "crop_grape_s05",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "葡萄",
+      "name": "转色成熟采收",
+      "sortOrder": 5,
+      "startDay": 131,
+      "endDay": 190,
+      "color": "#6A3FB5",
+      "fertilizerPlan": "转色后停氮，补钾；采前 10 天停水。",
+      "pestControl": "采前 15 天停药；防鸟害、蜂害。",
+      "operationTips": "葡萄糖度达标后分批采收；采后及时预冷。",
+      "reminders": [
+        {
+          "id": "sr_grape_05_a",
+          "kind": "施肥",
+          "title": "硫酸钾追施",
+          "startOffset": 1,
+          "intervalDays": 15,
+          "repeatCount": 2,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_grape_05_b",
+          "kind": "其他",
+          "title": "检查果穗",
+          "startOffset": 5,
+          "intervalDays": 10,
+          "repeatCount": 4,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_grape_s06",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "葡萄",
+      "name": "落叶休眠",
+      "sortOrder": 6,
+      "startDay": 191,
+      "endDay": 364,
+      "color": "#8A857F",
+      "fertilizerPlan": "采后施基肥（有机肥 + 磷钾），全年最重要的一次。",
+      "pestControl": "清园：剪除病枝、清扫落叶；冬剪后喷石硫合剂。",
+      "operationTips": "冬剪：留 2–3 芽短梢修剪；埋土或包裹防冻（北方）。",
+      "reminders": [
+        {
+          "id": "sr_grape_06_a",
+          "kind": "施肥",
+          "title": "秋施基肥",
+          "startOffset": 10,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "有机肥 + 过磷酸钙",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_grape_06_b",
+          "kind": "其他",
+          "title": "冬剪与清园",
+          "startOffset": 60,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_fig_s01",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "无花果",
+      "name": "萌芽抽梢",
+      "sortOrder": 1,
+      "startDay": 0,
+      "endDay": 30,
+      "color": "#0B8F63",
+      "fertilizerPlan": "萌芽前施有机肥；新梢期薄施平衡肥。",
+      "pestControl": "清园防炭疽病、螨类；剪除冻伤枝。",
+      "operationTips": "修剪：短截促发结果枝；保证充足光照。",
+      "reminders": [
+        {
+          "id": "sr_fig_01_a",
+          "kind": "施肥",
+          "title": "萌芽有机肥",
+          "startOffset": 1,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_fig_01_b",
+          "kind": "施药",
+          "title": "清园",
+          "startOffset": 5,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_fig_s02",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "无花果",
+      "name": "现果期",
+      "sortOrder": 2,
+      "startDay": 31,
+      "endDay": 60,
+      "color": "#2FA97C",
+      "fertilizerPlan": "现果后转高钾，10 天一次共 2 次。",
+      "pestControl": "防锈病、红蜘蛛；注意通风。",
+      "operationTips": "疏果：每叶腋留 1–2 个果，去除过密果。",
+      "reminders": [
+        {
+          "id": "sr_fig_02_a",
+          "kind": "施肥",
+          "title": "高钾水溶肥",
+          "startOffset": 5,
+          "intervalDays": 10,
+          "repeatCount": 2,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_fig_02_b",
+          "kind": "其他",
+          "title": "疏果",
+          "startOffset": 15,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_fig_s03",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "无花果",
+      "name": "果实膨大",
+      "sortOrder": 3,
+      "startDay": 61,
+      "endDay": 120,
+      "color": "#3E9B6B",
+      "fertilizerPlan": "高钾 + 钙，7–10 天一次共 5 次；均匀供水。",
+      "pestControl": "防锈病、果实蝇；套袋或防虫网。",
+      "operationTips": "缺水会导致果小、落果；但积水易裂果，保持稳定湿度。",
+      "reminders": [
+        {
+          "id": "sr_fig_03_a",
+          "kind": "施肥",
+          "title": "高钾 + 钙",
+          "startOffset": 1,
+          "intervalDays": 8,
+          "repeatCount": 5,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_fig_03_b",
+          "kind": "浇水",
+          "title": "稳定供水",
+          "startOffset": 1,
+          "intervalDays": 4,
+          "repeatCount": 12,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_fig_s04",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "无花果",
+      "name": "夏果成熟",
+      "sortOrder": 4,
+      "startDay": 121,
+      "endDay": 170,
+      "color": "#D9534F",
+      "fertilizerPlan": "采前停氮；每采一批追一次薄肥。",
+      "pestControl": "采前 7 天停药；防果蝇、鸟害。",
+      "operationTips": "果皮转色、果颈下垂、微软时采收；清晨采最好。",
+      "reminders": [
+        {
+          "id": "sr_fig_04_a",
+          "kind": "施肥",
+          "title": "采后薄肥",
+          "startOffset": 1,
+          "intervalDays": 10,
+          "repeatCount": 3,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_fig_04_b",
+          "kind": "其他",
+          "title": "检查果实",
+          "startOffset": 3,
+          "intervalDays": 7,
+          "repeatCount": 6,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_fig_s05",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "无花果",
+      "name": "秋果成熟",
+      "sortOrder": 5,
+      "startDay": 171,
+      "endDay": 240,
+      "color": "#C9A227",
+      "fertilizerPlan": "秋果期补一次高钾，避免早衰。",
+      "pestControl": "继续防果蝇、锈病；注意夜间保温。",
+      "operationTips": "秋果品质略逊于夏果，可适当少留果以保证树势。",
+      "reminders": [
+        {
+          "id": "sr_fig_05_a",
+          "kind": "施肥",
+          "title": "秋果补钾",
+          "startOffset": 1,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_fig_05_b",
+          "kind": "其他",
+          "title": "检查果实",
+          "startOffset": 5,
+          "intervalDays": 10,
+          "repeatCount": 5,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    },
+    {
+      "id": "crop_fig_s06",
+      "rev": 1,
+      "createdAt": "2026-10-01T09:00:00+08:00",
+      "updatedAt": "2026-11-20T11:30:00+08:00",
+      "deletedAt": null,
+      "crop": "无花果",
+      "name": "休眠期",
+      "sortOrder": 6,
+      "startDay": 241,
+      "endDay": 364,
+      "color": "#8A857F",
+      "fertilizerPlan": "落叶后施一次基肥（有机肥 + 磷钾）。",
+      "pestControl": "清园：清扫落叶、剪除病枝；主干包裹防冻。",
+      "operationTips": "控水；北方需移入室内或包裹防冻，避免枝条冻伤。",
+      "reminders": [
+        {
+          "id": "sr_fig_06_a",
+          "kind": "施肥",
+          "title": "秋施基肥",
+          "startOffset": 10,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 1
+        },
+        {
+          "id": "sr_fig_06_b",
+          "kind": "其他",
+          "title": "清园与防冻",
+          "startOffset": 45,
+          "intervalDays": 0,
+          "repeatCount": 1,
+          "notes": "",
+          "enabled": true,
+          "sortOrder": 2
+        }
+      ]
+    }
+  ]
+}
