@@ -5,8 +5,20 @@
 - 应用名：**种植助手**
 - 包名：`cn.zhongzhizhushou.planting`
 - 技术栈：Flutter 3.50 / Dart 3.14 + SQLite（sqflite）+ 本地通知
-- 当前版本：**1.4.0**（versionCode 5，数据库 schema v8，数据文件 schemaVersion 4）
+- 最新安装包：**1.5.0**（versionCode 6，[下载](#下载)）
+- 仓库源码快照：**1.4.0**（versionCode 5，数据库 schema v8，数据文件 schemaVersion 4）
 - 特点：**没有 INTERNET 权限**，所有数据只存在手机上，不登录、不联网、不上传
+
+---
+
+## 下载
+
+- [GitHub Releases · v1.5.0](https://github.com/lhyza/PlantingAssistant/releases/tag/v1.5.0)
+- 直接下载：[种植助手-1.5.0-release.apk](https://github.com/lhyza/PlantingAssistant/releases/download/v1.5.0/%E7%A7%8D%E6%A4%8D%E5%8A%A9%E6%89%8B-1.5.0-release.apk)
+- 大小：62,555,705 字节（约 59.7 MB）
+- SHA-256：`1ebd848a4c3ece6e368452b65bcdfb64e38a8e0962041b2a41901715d945b581`
+
+> 1.5.0 安装包的数据格式标识是 `caomeiyuan.data`；下面源码快照 1.4.0 使用 `planting.data`，两边的 JSON 导出文件不能直接互导。
 
 ---
 
@@ -82,8 +94,21 @@ storeFile=相对路径或绝对路径/release.jks
 - 数据存于 App 私有目录：`files/planting.db`（SQLite）+ `files/images/`（照片）。
 - 卸载即清空。**备份方式**：App 内「我的 → 数据管理 → 全部导出」，可导出 7 份 JSON（图片以 base64 内嵌），换机后用「导入」还原。
 - 内置知识库只是文本资料，不含任何账号、接口或第三方服务信息。
-- 数据文件的格式标识为 `planting.data`（见 `lib/data/transfer.dart` 的 `kFormat` 与 `assets/seeds/*.json` 的 `format` 字段）。
+- 数据文件的格式标识：源码快照 1.4.0 为 `planting.data`，1.5.0 安装包为 `caomeiyuan.data`（见 `lib/data/transfer.dart` 的 `kFormat` 与 `assets/seeds/*.json` 的 `format` 字段）；两边的导出文件不能直接互导。
   **如果你手上还有另一份同款 App 导出的 JSON**，两边 `format` 必须一致才能互相导入；不一致时只改这两个地方即可。
+
+## 更新记录
+
+### 1.5.0（2026-11-23）
+- 导入 AI 数据包现在支持直接选 `.json` 文件（手机版豆包也能用）
+- `.json` 导入不显示「!」提示，图片可以以后自己补
+- 新增导入预览页：先看清「新增 / 更新 / 合并 / 跳过」，可逐条勾选后再写入
+- 通用病虫害条目不会被草莓版内容覆盖（自动跳过，需修改请在知识库里直接编辑）
+- 疑似同名的条目自动合并，预览页会标出合并到哪一条
+- 导入失败时给出具体原因（不是 zip、缺 data.json、选错成数据管理导出文件等）
+
+### 1.4.0（2026-11-23）
+- 多批次提醒、AI 模板与导入、病虫害多作物；新建提醒可一次勾选多个批次，列表合并展示
 
 ## 文档索引
 
