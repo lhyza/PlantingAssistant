@@ -14,6 +14,7 @@ import 'package:planting/app.dart';
 import 'package:planting/core/util.dart';
 import 'package:planting/data/models.dart';
 import 'package:planting/data/repo.dart';
+import 'package:planting/ui/record_list.dart';
 
 class _FakePathProvider extends PathProviderPlatform
     with MockPlatformInterfaceMixin {
@@ -41,7 +42,20 @@ Future<void> _loadFonts() async {
   final f = File(r'C:\Windows\Fonts\simhei.ttf');
   if (!f.existsSync()) return;
   final bytes = await f.readAsBytes();
-  for (final family in ['Roboto', 'Noto Sans CJK SC', 'Microsoft YaHei']) {
+  // 测试环境没有系统字体，且工具栏/按钮的样式是裸 TextStyle（不继承主题的
+  // fontFamilyFallback），所以把常见默认族名都注册一遍，截图才不会是方框。
+  const families = [
+    'Roboto',
+    'Noto Sans CJK SC',
+    'Microsoft YaHei',
+    'Noto Sans SC',
+    '.SF UI Text',
+    'Segoe UI',
+    'Arial',
+    'Helvetica',
+    'sans-serif',
+  ];
+  for (final family in families) {
     final loader = FontLoader(family)
       ..addFont(Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)));
     await loader.load();
@@ -183,6 +197,41 @@ void main() {
     await tester.tap(find.text('我的').last);
     await _flush(tester, 6);
     await _shot(tester, '../docs/images/app-real-me.png');
+    await _flush(tester);
+  });
+
+  testWidgets('导出版本更新页截图', (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const RepaintBoundary(key: Key('shot'), child: PlantingApp()),
+    );
+    await _flush(tester, 10);
+
+    await tester.tap(find.text('我的').last);
+    await _flush(tester, 6);
+    await tester.tap(find.text('版本更新').last);
+    await _flush(tester, 10);
+    await _shot(tester, '../docs/images/app-real-update.png');
+    await _flush(tester);
+  });
+
+  testWidgets('导出记录详情截图（今天页按操作翻页）', (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const RepaintBoundary(key: Key('shot'), child: PlantingApp()),
+    );
+    await _flush(tester, 10);
+
+    // 「白粉病预防」同时是提醒标题，这里精确点「近 15 天操作」里的记录行
+    await tester.tap(find.byType(OpRecordTile).first);
+    await _flush(tester, 8);
+    await _shot(tester, '../docs/images/app-real-record-detail.png');
     await _flush(tester);
   });
 }

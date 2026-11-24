@@ -33,9 +33,9 @@ class UpdateBridge(private val activity: Activity) : MethodChannel.MethodCallHan
         try {
             when (call.method) {
                 "start" -> result.success(start(call))
-                "progress" -> result.success(progress(call.argument<Long>("id") ?: -1L))
+                "progress" -> result.success(progress(longArg(call, "id")))
                 "cancel" -> {
-                    val id = call.argument<Long>("id") ?: -1L
+                    val id = longArg(call, "id")
                     if (id > 0) dm.remove(id)
                     result.success(true)
                 }
@@ -47,8 +47,10 @@ class UpdateBridge(private val activity: Activity) : MethodChannel.MethodCallHan
                 "sha256" -> result.success(sha256(call.argument<String>("path") ?: ""))
                 "freeSpace" -> result.success(freeSpace())
                 "selfCert" -> result.success(selfCert())
+                // 备用下载渠道 / 源码链接：交给系统浏览器或对应 App 打开
+                "open" -> result.success(openUrl(call.argument<String>("url") ?: ""))
                 "clear" -> {
-                    val id = call.argument<Long>("id") ?: -1L
+                    val id = longArg(call, "id")
                     if (id > 0) runCatching { dm.remove(id) }
                     prefs.edit().remove("id").apply()
                     result.success(true)
@@ -57,6 +59,23 @@ class UpdateBridge(private val activity: Activity) : MethodChannel.MethodCallHan
             }
         } catch (e: Exception) {
             result.error("update_error", e.message ?: e.toString(), null)
+        }
+    }
+
+    /**
+     * 读 Long 参数。
+     *
+     * 注意：Dart 侧 StandardMessageCodec 会把能放进 32 位的 int 编码成 INT32，
+     * 到 Android 就是 java.lang.Integer。若直接 `call.argument<Long>("id")`
+     * 会在运行时抛 ClassCastException: Integer cannot be cast to Long
+     * （曾导致「读取下载进度失败」）。所以统一按 Number 转换。
+     */
+    private fun longArg(call: MethodCall, key: String): Long {
+        return when (val v = call.argument<Any>(key)) {
+            null -> -1L
+            is Number -> v.toLong()
+            is String -> v.toLongOrNull() ?: -1L
+            else -> -1L
         }
     }
 
@@ -133,6 +152,18 @@ class UpdateBridge(private val activity: Activity) : MethodChannel.MethodCallHan
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         activity.startActivity(intent)
+    }
+
+    /** 用 ACTION_VIEW 打开链接；没有可用应用时返回 false，而不是抛异常。 */
+    private fun openUrl(url: String): Boolean {
+        if (url.isBlank()) return false
+        return runCatching {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            activity.startActivity(intent)
+            true
+        }.getOrDefault(false)
     }
 
     // ---------------- verify ----------------

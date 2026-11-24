@@ -55,7 +55,7 @@ class _TodayPageState extends State<TodayPage> {
     // 提醒跨作物共享，批次名要从全部批次里查，否则其它作物的提醒会显示成「批次」
     final all = await repo.batches();
     final rs = await repo.reminders();
-    final rq = await repo.recordsSince(15, limit: 60);
+    final rq = await repo.recordsSince(15, limit: 200);
     final map = <String, StageSnapshot>{};
     for (final b in bs) {
       map[b.id] = await repo.snapshot(b);
@@ -584,6 +584,9 @@ class _TodayPageState extends State<TodayPage> {
       }
       map[key]!.add(r);
     }
+    // 详情页要按「操作」翻页：把完整顺序传下去（不止前 6 条），
+    // 且 index 必须是当前这条操作在 groups 里的位置，否则会在同一组内打转。
+    final groups = [for (final k in order) map[k]!];
     return [
       for (final k in order.take(6))
         Padding(
@@ -595,7 +598,8 @@ class _TodayPageState extends State<TodayPage> {
               MaterialPageRoute(
                 builder: (_) => RecordDetailPage(
                   items: map[k]!,
-                  index: 0,
+                  index: order.indexOf(k),
+                  groups: groups,
                   batchNames: batchNames,
                 ),
               ),

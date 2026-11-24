@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 
+/// 中文回退字体链。AppBar 标题与按钮的文字样式是裸 [TextStyle]，
+/// 不会继承 [ThemeData.fontFamilyFallback]，这里显式挂上，避免中文回落成方框。
+const List<String> kFontFallback = [
+  'Source Han Sans SC',
+  'Noto Sans CJK SC',
+  'PingFang SC',
+  'Microsoft YaHei',
+];
+
 const Color kRed = Color(0xFFE8354D);
 const Color kRedDeep = Color(0xFFC0233B);
 const Color kInk = Color(0xFF1C1917);
@@ -24,12 +33,7 @@ ThemeData buildTheme() {
       surface: Colors.white,
     ),
     scaffoldBackgroundColor: kBg,
-    fontFamilyFallback: const [
-      'Source Han Sans SC',
-      'Noto Sans CJK SC',
-      'PingFang SC',
-      'Microsoft YaHei',
-    ],
+    fontFamilyFallback: kFontFallback,
   );
   return base.copyWith(
     textTheme: base.textTheme.apply(bodyColor: kInk, displayColor: kInk),
@@ -42,6 +46,7 @@ ThemeData buildTheme() {
         color: kInk,
         fontSize: 19,
         fontWeight: FontWeight.w700,
+        fontFamilyFallback: kFontFallback,
       ),
     ),
     cardTheme: CardThemeData(
@@ -58,7 +63,11 @@ ThemeData buildTheme() {
         backgroundColor: kRed,
         foregroundColor: Colors.white,
         minimumSize: const Size(0, 48),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          fontFamilyFallback: kFontFallback,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
@@ -68,7 +77,11 @@ ThemeData buildTheme() {
         minimumSize: const Size(0, 48),
         side: const BorderSide(color: kLine),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          fontFamilyFallback: kFontFallback,
+        ),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(

@@ -1,6 +1,6 @@
 # 种植助手 · App 设计文档
 
-> 版本 1.8.0 ｜ 数据库 schema v10 ｜ 数据文件 schemaVersion 5 ｜ 2026-11-24
+> 版本 1.8.2 ｜ 数据库 schema v10 ｜ 数据文件 schemaVersion 5 ｜ 2026-11-24
 > 配套源码：`../app/`（Flutter 3.50 / Dart 3.14）
 
 ---
@@ -571,7 +571,7 @@ graph LR
   "name": "品种库",
   "updatedAt": "2026-11-21T17:20:00+08:00",
   "revision": 12,
-  "appVersion": "1.8.0",
+  "appVersion": "1.8.2",
   "count": 20,
   "items": [ { "id": "var_xxx", "rev": 3, "updatedAt": "…", "deletedAt": null, … } ]
 }
@@ -778,5 +778,7 @@ App 内即可：「作物管理 → 该作物 → 一年几季」选 2~3 季并�
 | 1.4.0 | 多批次提醒（`groupId` 合并、信息框完成/编辑/取消）、长按菜单中文化、病虫害多作物绑定、药品三行卡、AI 模板与 zip 数据包导入（含「!」待裁剪标记）、关于页更新记录、导出 schemaVersion 4 |
 | 1.5.0 | AI 数据包支持纯 JSON（zip / json 双通道按文件头识别）、导入预览页、通用条目跳过、别名自动合并、JSON 导入不标「!」 |
 | 1.6.0 | 应用内检查更新（GitHub Release + 镜像 + DownloadManager + 五项校验）、病虫害「影响作物」显示修复 |
+| 1.8.2 | 今天页「近 15 天操作」入口补齐 `groups`/`index`（原来只传单组 `items`，翻页在同一次操作的多批次间打转）；取记录上限 60 → 200；`core/theme.dart` 引入 `kFontFallback` 并挂到 AppBar 标题与按钮文字，避免部分环境中文落成方框 |
+| 1.8.1 | 修复应用内更新读进度崩溃（Kotlin 侧 `call.argument<Long>` 对小整数抛 `ClassCastException`，改用 `longArg()` 兼容 Number/String；Dart 侧连续 6 次读失败才判失败）、记录详情在合并模式下按**操作**翻页（`groups` 参数 + 「第 N/M 次操作」）、版本更新页新增「备用下载与源码」卡（`core/links.dart` + 原生 `open` 方法用系统 Intent） |
 | 1.8.0 | 今天页阶段条**标注批次**（多批次可切换、点条体进详情）、修「编辑第 2 季阶段被写回第 1 季」（编辑不改季 + 启动 `normalizeStageSeasons()` 按 id 归位）、阶段**可删除**（连提醒模板软删）、`copySeasonStages` 返回 `(copied, skipped)` 并跳过同名阶段、近 7 天→**近 15 天**、记录行顺序改为 产品→施用→未施→备注、全部记录**不限时间**（30 条/页 + 总数）、记录详情显示施用/未施批次、批次卡标题行合并「批次名 + 状态」 |
 | 1.7.0 | 多季作物（`crops.seasons` / `stages.season` / `batches.season`、从上一季复制、开启新一季）、今天页改「近 7 天操作」、一次操作多批次的 `opId` 与未施快照、施用方式多选、批次行压缩、按钮不换行、通用/禁用标签统一、导出 schemaVersion 5 |

@@ -151,7 +151,8 @@ class _RecordListPageState extends State<RecordListPage> {
                               MaterialPageRoute(
                                 builder: (_) => RecordDetailPage(
                                   items: g,
-                                  index: 0,
+                                  index: i,
+                                  groups: groups,
                                   photo: widget.photo,
                                   batchNames: batchNames,
                                 ),
@@ -207,10 +208,19 @@ class RecordDetailPage extends StatefulWidget {
     super.key,
     required this.items,
     required this.index,
+    this.groups,
     this.photo = false,
     this.batchNames = const {},
   });
+  /// 当前要显示的那一组记录（同一批次内通常只有 1 条；
+  /// 合并模式下是同一次操作里的多条）。
   final List<GardenRecord> items;
+
+  /// 合并模式（今天页「近 15 天」/「全部记录」）下，按「一次操作」分好组的全量列表。
+  ///
+  /// 有值时上一条/下一条在**不同操作之间**切换，而不是在一次操作的多个批次之间打转
+  /// ——后者每次翻页标题/产品/备注都不变，看起来像没反应。
+  final List<List<GardenRecord>>? groups;
   final int index;
   final bool photo;
   final Map<String, String> batchNames;
@@ -220,9 +230,20 @@ class RecordDetailPage extends StatefulWidget {
 }
 
 class _RecordDetailPageState extends State<RecordDetailPage> {
+  /// groups 非空时表示第几次「操作」；否则是第几条「记录」。
   late int i = widget.index;
   Map<String, String> names = {};
   List<GardenRecord> siblings = [];
+
+  List<List<GardenRecord>>? get _groups => widget.groups;
+
+  /// 当前这次的完整一组记录（合并模式下同一次操作的多条；否则就是这一条）。
+  List<GardenRecord> get _cur =>
+      _groups != null ? _groups![i] : <GardenRecord>[widget.items[i]];
+
+  GardenRecord get _head => _cur.first;
+
+  int get _total => _groups?.length ?? widget.items.length;
 
   @override
   void initState() {
@@ -234,9 +255,13 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
     names = widget.batchNames.isEmpty
         ? await Repo.instance.batchNames()
         : widget.batchNames;
-    final r = widget.items[widget.index];
-    if (r.opId.isNotEmpty) {
+    final r = _head;
+    if (_groups != null) {
+      siblings = _cur;
+    } else if (r.opId.isNotEmpty) {
       siblings = await Repo.instance.recordsByOp(r.opId);
+    } else {
+      siblings = [];
     }
     if (mounted) setState(() {});
   }
@@ -315,11 +340,16 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
     );
   }
 
+  void _go(int d) {
+    setState(() => i += d);
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final r = widget.items[i];
+    final r = _head;
     final hasPrev = i > 0;
-    final hasNext = i < widget.items.length - 1;
+    final hasNext = i < _total - 1;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.photo ? '拍照记录' : '操作记录'),
@@ -327,7 +357,10 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Center(
-              child: Text('${i + 1}/${widget.items.length}', style: tSub),
+              child: Text(
+                _groups == null ? '${i + 1}/$_total' : '第 ${i + 1}/$_total 次操作',
+                style: tSub,
+              ),
             ),
           ),
         ],
@@ -408,11 +441,9 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: hasPrev
-                            ? () => setState(() => i -= 1)
-                            : null,
+                        onPressed: hasPrev ? () => _go(-1) : null,
                         icon: const Icon(Icons.chevron_left, size: 18),
-                        label: const Text('上一条'),
+                        label: Text(_groups == null ? '上一条' : '上一次'),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, 46),
                         ),
@@ -421,11 +452,9 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: hasNext
-                            ? () => setState(() => i += 1)
-                            : null,
+                        onPressed: hasNext ? () => _go(1) : null,
                         icon: const Icon(Icons.chevron_right, size: 18),
-                        label: const Text('下一条'),
+                        label: Text(_groups == null ? '下一条' : '下一次'),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(0, 46),
                         ),

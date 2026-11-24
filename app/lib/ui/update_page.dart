@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/links.dart';
 import '../core/theme.dart';
 import '../core/version.dart';
 import '../data/update_controller.dart';
@@ -46,12 +47,138 @@ class _UpdatePageState extends State<UpdatePage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: [
+          _linksCard(),
+          const SizedBox(height: 14),
           _versionCard(),
           const SizedBox(height: 14),
           ..._body(),
           const SizedBox(height: 18),
           _notes(),
         ],
+      ),
+    );
+  }
+
+
+  /// 备用下载渠道与源码：纯文本展示，点一下交给系统浏览器/对应 App。
+  Widget _linksCard() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionTitle('备用下载与源码'),
+        Container(
+          padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+          decoration: cardDeco(),
+          child: Column(
+            children: [
+              _linkRow(
+                icon: Icons.folder_shared_outlined,
+                title: '百度网盘',
+                url: kLinkBaidu,
+              ),
+              const Divider(height: 1, indent: 12, endIndent: 12),
+              _linkRow(
+                icon: Icons.cloud_outlined,
+                title: '蓝奏云',
+                url: kLinkLanzou,
+                pwd: kLanzouPwd,
+              ),
+              const Divider(height: 1, indent: 12, endIndent: 12),
+              _linkRow(
+                icon: Icons.code,
+                title: 'GitHub 源码 / APK',
+                url: kLinkGithub,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _linkRow({
+    required IconData icon,
+    required String title,
+    required String url,
+    String? pwd,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        final ok = await Links.open(url);
+        if (!ok && mounted) toast(context, '没有找到能打开链接的 App');
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 10, 4, 10),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: kInk2),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: tBody.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      if (pwd != null) ...[
+                        const SizedBox(width: 8),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(6),
+                          onTap: () async {
+                            await Links.copy(pwd);
+                            if (mounted) toast(context, '已复制密码 $pwd');
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            child: Text(
+                              '密码 $pwd',
+                              style: tTiny.copyWith(
+                                color: kRedDeep,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    url,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: tTiny.copyWith(color: kInk3),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: '复制链接',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.copy_all_outlined, size: 19),
+              onPressed: () async {
+                await Links.copy(url);
+                if (mounted) toast(context, '已复制链接');
+              },
+            ),
+            IconButton(
+              tooltip: '打开链接',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.open_in_new, size: 19),
+              onPressed: () async {
+                final ok = await Links.open(url);
+                if (!ok && mounted) toast(context, '没有找到能打开链接的 App');
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

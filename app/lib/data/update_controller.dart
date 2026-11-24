@@ -36,6 +36,7 @@ class UpdateController extends ChangeNotifier {
   DateTime? _lastTick;
   int _lastBytes = 0;
   double _speed = 0;
+  int _pollErrors = 0; // 连续读取进度失败次数（偶发失败不打断下载）
   bool _busy = false;
 
   bool get hasUpdate => info != null && UpdateService.compareVersions(info!.version, kAppVersion) > 0;
@@ -154,6 +155,7 @@ class UpdateController extends ChangeNotifier {
     _timer?.cancel();
     _lastTick = DateTime.now();
     _lastBytes = 0;
+    _pollErrors = 0;
     _timer = Timer.periodic(const Duration(milliseconds: 700), (t) async {
       if (downloadId <= 0) {
         t.cancel();
@@ -161,6 +163,7 @@ class UpdateController extends ChangeNotifier {
       }
       try {
         final p = await Downloader.progress(downloadId);
+        _pollErrors = 0;
         if (p.path.isNotEmpty) apkPath = p.path;
         downloaded = p.downloaded;
         if (p.total > 0) total = p.total;
@@ -176,6 +179,10 @@ class UpdateController extends ChangeNotifier {
           notifyListeners();
         }
       } catch (e) {
+        // 读取进度偶发失败（系统繁忙、下载器重启等）不该直接把下载判死：
+        // 连续失败多次才认为真的断了，让用户在通知栏里看到的下载继续跑。
+        _pollErrors++;
+        if (_pollErrors < 6) return;
         t.cancel();
         phase = UpdatePhase.failed;
         error = '读取下载进度失败：$e';
