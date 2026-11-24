@@ -3,6 +3,37 @@ library;
 
 import 'dart:convert';
 
+class CropSeason {
+  CropSeason({required this.idx, this.name = '', this.start = ''});
+  int idx; // 1..3
+  String name; // 夏果季 / 本季
+  String start; // MM-DD；一年生留空（用定植日）
+  Map<String, dynamic> toMap() => {'idx': idx, 'name': name, 'start': start};
+  static CropSeason fromMap(Map<String, dynamic> m) => CropSeason(
+    idx: (m['idx'] as num?)?.toInt() ?? 1,
+    name: (m['name'] ?? '').toString(),
+    start: (m['start'] ?? '').toString(),
+  );
+  /// 解析 JSON 字符串或 List（兼容种子文件与 DB）
+  static List<CropSeason> parse(dynamic v) {
+    dynamic raw = v;
+    if (raw is String) {
+      if (raw.trim().isEmpty) return [];
+      try {
+        raw = jsonDecode(raw);
+      } catch (_) {
+        return [];
+      }
+    }
+    if (raw is! List) return [];
+    return raw
+        .whereType<Map>()
+        .map((e) => CropSeason.fromMap(Map<String, dynamic>.from(e)))
+        .toList()
+      ..sort((a, b) => a.idx.compareTo(b.idx));
+  }
+}
+
 class Crop {
   Crop({
     required this.id,
@@ -11,6 +42,7 @@ class Crop {
     this.color = '#4A7FC0',
     this.lifeCycle = 'annual',
     this.cycleStart = '',
+    List<CropSeason>? seasons,
     this.unit = '盆',
     this.isDefault = false,
     this.enabled = true,
@@ -20,7 +52,7 @@ class Crop {
     this.createdAt = '',
     this.updatedAt = '',
     this.deletedAt,
-  });
+  }) : seasons = seasons ?? [];
 
   final String id;
   String name;
@@ -28,6 +60,7 @@ class Crop {
   String color;
   String lifeCycle; // annual | perennial
   String cycleStart; // MM-DD
+  List<CropSeason> seasons; // v1.7：1~3 季
   String unit;
   bool isDefault;
   bool enabled;
@@ -40,6 +73,14 @@ class Crop {
 
   bool get isPerennial => lifeCycle == 'perennial';
 
+  /// 有效的季列表：永远至少 1 季（老数据或一年生）
+  List<CropSeason> get effSeasons {
+    if (seasons.isNotEmpty) return seasons;
+    return [CropSeason(idx: 1, name: '本季', start: cycleStart)];
+  }
+
+  int get seasonCount => effSeasons.length;
+
   Map<String, dynamic> toMap() => {
     'id': id,
     'name': name,
@@ -47,6 +88,7 @@ class Crop {
     'color': color,
     'lifeCycle': lifeCycle,
     'cycleStart': cycleStart,
+    'seasons': jsonEncode(seasons.map((e) => e.toMap()).toList()),
     'unit': unit,
     'isDefault': isDefault ? 1 : 0,
     'enabled': enabled ? 1 : 0,
@@ -65,6 +107,7 @@ class Crop {
     color: m['color'] as String? ?? '#4A7FC0',
     lifeCycle: m['lifeCycle'] as String? ?? 'annual',
     cycleStart: m['cycleStart'] as String? ?? '',
+    seasons: CropSeason.parse(m['seasons']),
     unit: m['unit'] as String? ?? '盆',
     isDefault: (m['isDefault'] ?? 0) == 1,
     enabled: (m['enabled'] ?? 1) == 1,
@@ -437,6 +480,7 @@ class Stage {
   Stage({
     required this.id,
     required this.crop,
+    this.season = 0,
     this.name = '',
     this.sortOrder = 0,
     this.startDay = 0,
@@ -453,6 +497,7 @@ class Stage {
 
   final String id;
   String crop;
+  int season; // 0 起；对应 crop.effSeasons 下标
   String name;
   int sortOrder;
   int startDay;
@@ -471,6 +516,7 @@ class Stage {
   Map<String, dynamic> toMap() => {
     'id': id,
     'crop': crop,
+    'season': season,
     'name': name,
     'sortOrder': sortOrder,
     'startDay': startDay,
@@ -488,6 +534,7 @@ class Stage {
   static Stage fromMap(Map<String, dynamic> m) => Stage(
     id: m['id'] as String,
     crop: m['crop'] as String? ?? '',
+    season: (m['season'] as num?)?.toInt() ?? 0,
     name: m['name'] as String? ?? '',
     sortOrder: m['sortOrder'] as int? ?? 0,
     startDay: m['startDay'] as int? ?? 0,
@@ -512,6 +559,7 @@ class Batch {
     this.varietyId = '',
     this.plantDate = '',
     this.cycleStartDate = '',
+    this.season = 0,
     this.location = '',
     this.potCount = 1,
     this.status = '进行中',
@@ -535,6 +583,7 @@ class Batch {
   String varietyId;
   String plantDate;
   String cycleStartDate;
+  int season; // 0 起，对应 crop.effSeasons 下标
   String location;
   int potCount;
   String status;
@@ -560,6 +609,7 @@ class Batch {
     'varietyId': varietyId,
     'plantDate': plantDate,
     'cycleStartDate': cycleStartDate,
+    'season': season,
     'location': location,
     'potCount': potCount,
     'status': status,
@@ -584,6 +634,7 @@ class Batch {
     varietyId: m['varietyId'] as String? ?? '',
     plantDate: m['plantDate'] as String? ?? '',
     cycleStartDate: m['cycleStartDate'] as String? ?? '',
+    season: (m['season'] as num?)?.toInt() ?? 0,
     location: m['location'] as String? ?? '',
     potCount: m['potCount'] as int? ?? 1,
     status: m['status'] as String? ?? '进行中',
@@ -618,11 +669,13 @@ class GardenRecord {
     this.imgH = 0,
     this.notes = '',
     this.stageId = '',
+    this.opId = '',
+    List<String>? opSkipped,
     this.rev = 1,
     this.createdAt = '',
     this.updatedAt = '',
     this.deletedAt,
-  });
+  }) : opSkipped = opSkipped ?? [];
 
   final String id;
   String batchId;
@@ -641,6 +694,12 @@ class GardenRecord {
   int imgH;
   String notes;
   String stageId;
+
+  /// v1.7：同一次「记一笔」写出的多条记录共用一个 opId
+  String opId;
+
+  /// v1.7：这次没有勾选的批次 id 快照（「未施」名单）
+  List<String> opSkipped;
   int rev;
   String createdAt;
   String updatedAt;
@@ -662,6 +721,8 @@ class GardenRecord {
     'imgH': imgH,
     'notes': notes,
     'stageId': stageId,
+    'opId': opId,
+    'opSkipped': opSkipped.isEmpty ? '' : jsonEncode(opSkipped),
     'rev': rev,
     'createdAt': createdAt,
     'updatedAt': updatedAt,
@@ -684,6 +745,8 @@ class GardenRecord {
     imgH: (m['imgH'] as num?)?.toInt() ?? 0,
     notes: m['notes'] as String? ?? '',
     stageId: m['stageId'] as String? ?? '',
+    opId: m['opId'] as String? ?? '',
+    opSkipped: _strList(m['opSkipped']),
     rev: m['rev'] as int? ?? 1,
     createdAt: m['createdAt'] as String? ?? '',
     updatedAt: m['updatedAt'] as String? ?? '',
@@ -789,20 +852,41 @@ class StageSnapshot {
 
 /// 记一笔里的一个产品（复配时有多行）
 class RecordProduct {
-  RecordProduct({this.name = '', this.dosage = '', this.method = '灌根'});
+  RecordProduct({
+    this.name = '',
+    this.dosage = '',
+    this.method = '灌根',
+    List<String>? methods,
+  }) : methods = methods ?? [];
+
   String name;
   String dosage;
+
+  /// 旧字段：第一个方式
   String method;
+
+  /// v1.7：可多选
+  List<String> methods;
+
+  List<String> get effMethods {
+    final m = methods.where((e) => e.trim().isNotEmpty).toList();
+    if (m.isNotEmpty) return m;
+    return method.trim().isEmpty ? const [] : [method];
+  }
+
+  String get methodsText => effMethods.join('、');
 
   Map<String, dynamic> toMap() => {
     'name': name,
     'dosage': dosage,
     'method': method,
+    'methods': methods,
   };
   static RecordProduct fromMap(Map<String, dynamic> m) => RecordProduct(
     name: (m['name'] ?? '').toString(),
     dosage: (m['dosage'] ?? '').toString(),
     method: (m['method'] ?? '灌根').toString(),
+    methods: _strList(m['methods']),
   );
 }
 
@@ -863,6 +947,7 @@ class Supply {
     this.name = '',
     this.ratio = '',
     this.method = '灌根',
+    List<String>? methods,
     this.notes = '',
     this.image = '',
     this.scope = 'common',
@@ -874,13 +959,19 @@ class Supply {
     this.createdAt = '',
     this.updatedAt = '',
     this.deletedAt,
-  }) : disabledCrops = disabledCrops ?? [];
+  }) : disabledCrops = disabledCrops ?? [],
+       methods = methods ?? [];
 
   final String id;
   String kind;
   String name;
   String ratio;
+
+  /// 旧字段：第一个方式（兼容老数据/导出）
   String method;
+
+  /// v1.7：施用方式可多选（灌根 / 喷雾 / 喷雾（叶背））
+  List<String> methods;
   String notes;
   String image;
   String scope;
@@ -895,6 +986,15 @@ class Supply {
 
   static const kMethods = ['灌根', '喷雾', '喷雾（叶背）'];
 
+  /// 有效方式：methods 优先，空则回落到 method
+  List<String> get effMethods {
+    final m = methods.where((e) => e.trim().isNotEmpty).toList();
+    if (m.isNotEmpty) return m;
+    return method.trim().isEmpty ? const ['灌根'] : [method];
+  }
+
+  String get methodsText => effMethods.join('、');
+
   bool blockedFor(String cropId) =>
       scope == 'disabled' && disabledCrops.contains(cropId);
 
@@ -904,6 +1004,7 @@ class Supply {
     'name': name,
     'ratio': ratio,
     'method': method,
+    'methods': jsonEncode(methods),
     'notes': notes,
     'image': image,
     'scope': scope,
@@ -923,6 +1024,7 @@ class Supply {
     name: m['name'] as String? ?? '',
     ratio: m['ratio'] as String? ?? '',
     method: m['method'] as String? ?? '灌根',
+    methods: _strList(m['methods']),
     notes: m['notes'] as String? ?? '',
     image: m['image'] as String? ?? '',
     scope: m['scope'] as String? ?? 'common',

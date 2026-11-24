@@ -308,9 +308,14 @@ class _KnowledgePageState extends State<KnowledgePage>
           cropImage: '',
           tags: [],
           tags2: [
-            if (m.method.isNotEmpty) m.method,
+            if (m.methodsText.isNotEmpty) m.methodsText,
             if (m.ratio.isNotEmpty) '兑水 ${m.ratio}',
-            _scopeLabel(m),
+          ],
+          tagWidgets2: [
+            ScopeTag(
+              text: _scopeLabel(m),
+              off: m.scope == 'disabled' && m.disabledCrops.isNotEmpty,
+            ),
           ],
           note: m.notes,
           incomplete: m.incomplete,
@@ -533,6 +538,7 @@ class _KnowledgePageState extends State<KnowledgePage>
     String cropImage = '',
     required List<String> tags,
     List<String> tags2 = const [],
+    List<Widget> tagWidgets2 = const [],
     bool pending = false,
     VoidCallback? onImageTap,
     required String note,
@@ -629,12 +635,15 @@ class _KnowledgePageState extends State<KnowledgePage>
                             runSpacing: 4,
                             children: tags.map((t) => Pill(t)).toList(),
                           ),
-                        if (tags2.isNotEmpty) ...[
+                        if (tags2.isNotEmpty || tagWidgets2.isNotEmpty) ...[
                           if (tags.isNotEmpty) const SizedBox(height: 5),
                           Wrap(
                             spacing: 6,
                             runSpacing: 4,
-                            children: tags2.map((t) => Pill(t)).toList(),
+                            children: [
+                              ...tags2.map((t) => Pill(t)),
+                              ...tagWidgets2,
+                            ],
                           ),
                         ],
                         if (note.isNotEmpty) ...[

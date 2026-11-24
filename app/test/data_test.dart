@@ -27,14 +27,15 @@ class _FakePathProvider extends PathProviderPlatform
 
 String _batchId = '';
 
-Future<Batch> makeBatch(String name) async {
+Future<Batch> makeBatch(String name, {String? id}) async {
   final crop = (await Repo.instance.defaultCrop())!;
   final b = Batch(
-    id: 'test_batch_1',
+    id: id ?? 'test_batch_1',
     crop: crop.id,
     name: name,
     variety: '红颜',
-    plantDate: '2026-10-01',
+    // 定植 55 天前 → 稳定落在催花/花芽分化期（9 天），提醒到期日在未来
+    plantDate: fmtDay(dateOnly(DateTime.now().subtract(const Duration(days: 55)))),
     location: '阳台',
     potCount: 12,
     color: '#D9534F',
@@ -353,16 +354,16 @@ void main() {
     expect(after.any((e) => e.id == 'ph_pot2'), isFalse);
   });
 
-  test('导出文件：schemaVersion 4 且带 pots / potIndex / groupId', () async {
+  test('导出文件：schemaVersion 5 且带 pots / potIndex / groupId', () async {
     final b = await makeBatch('导出测试');
     b.potCount = 2;
     await Repo.instance.saveBatch(b);
     final file = await Transfer.instance.buildFile('garden');
-    expect(file['schemaVersion'], 4);
+    expect(file['schemaVersion'], 5);
     expect((file['pots'] as List).length, greaterThanOrEqualTo(2));
     expect((file['batches'] as List).first, contains('photoMode'));
     final pestFile = await Transfer.instance.buildFile('pest');
-    expect(pestFile['schemaVersion'], 4);
+    expect(pestFile['schemaVersion'], 5);
     expect((pestFile['items'] as List).first, contains('crops'));
   });
 
@@ -440,6 +441,212 @@ void main() {
     final p = buildAiPrompt(cropName: '柠檬', kind: 'pest', links: const []);
     expect(p.contains('"kind": "pest"'), isTrue);
     expect(p.contains('treatment'), isTrue);
+  });
+
+
+  // ---------------- v1.7：多季 ----------------
+  test('多季作物：按季取阶段，切季改基准日', () async {
+    final c = Crop(
+      id: 'crop_grape2',
+      name: '葡萄（测试双季）',
+      emoji: '🍇',
+      lifeCycle: 'perennial',
+      cycleStart: '03-01',
+      unit: '株',
+      seasons: [
+        CropSeason(idx: 1, name: '夏果季', start: '03-01'),
+        CropSeason(idx: 2, name: '秋果季', start: '07-20'),
+      ],
+      sortOrder: 950,
+    );
+    await Repo.instance.saveCrop(c);
+
+    // 第 1 季两个阶段、第 2 季一个阶段
+    await Repo.instance.saveStage(
+      Stage(
+        id: 's_g1',
+        crop: c.id,
+        name: '萌芽',
+        startDay: 0,
+        endDay: 30,
+        season: 0,
+      ),
+    );
+    await Repo.instance.saveStage(
+      Stage(
+        id: 's_g2',
+        crop: c.id,
+        name: '开花',
+        startDay: 31,
+        endDay: 60,
+        season: 0,
+      ),
+    );
+    await Repo.instance.saveStage(
+      Stage(
+        id: 's_g3',
+        crop: c.id,
+        name: '秋梢',
+        startDay: 0,
+        endDay: 40,
+        season: 1,
+      ),
+    );
+
+    final s1 = await Repo.instance.stages(c.id, season: 0);
+    final s2 = await Repo.instance.stages(c.id, season: 1);
+    expect(s1.map((e) => e.name), ['萌芽', '开花']);
+    expect(s2.map((e) => e.name), ['秋梢']);
+    // 没配阶段的季 → 回落到第 1 季，避免空白
+    final s3 = await Repo.instance.stages(c.id, season: 2);
+    expect(s3.map((e) => e.name), ['萌芽', '开花']);
+
+    // 选第 2 季保存批次 → 基准日自动跟着季走
+    final b = Batch(
+      id: 'b_season',
+      crop: c.id,
+      name: '秋果批',
+      plantDate: '',
+      cycleStartDate: '03-01',
+      season: 1,
+      potCount: 1,
+    );
+    await Repo.instance.saveBatch(b);
+    final back = (await Repo.instance.batch('b_season'))!;
+    expect(back.season, 1);
+    expect(back.cycleStartDate, '07-20');
+    final snap = await Repo.instance.snapshot(back);
+    expect(snap?.stage?.name, '秋梢');
+
+    // 从第 1 季复制到第 3 季
+    final cp = await Repo.instance.copySeasonStages(c.id, 0, 2);
+    expect(cp.copied, 2);
+    expect(cp.skipped, 0);
+    final s4 = await Repo.instance.stages(c.id, season: 2);
+    expect(s4.length, 2);
+    expect(s4.every((e) => e.season == 2), isTrue);
+
+    // 再点一次「从上一季复制」→ 同名阶段全部跳过，不重复创建
+    final again = await Repo.instance.copySeasonStages(c.id, 0, 2);
+    expect(again.copied, 0);
+    expect(again.skipped, 2);
+    expect((await Repo.instance.stages(c.id, season: 2)).length, 2);
+
+    // v1.7 的 bug 现场：编辑时把季写成 0 → 启动归一化按 id 归位
+    final broken = (await Repo.instance.stageById(s4.first.id))!;
+    broken.season = 0;
+    await Repo.instance.saveStage(broken);
+    expect((await Repo.instance.stageById(broken.id))!.season, 0);
+    final fixed = await Repo.instance.normalizeStageSeasons();
+    expect(fixed >= 1, isTrue);
+    expect((await Repo.instance.stageById(broken.id))!.season, 2);
+
+    // 删除阶段：软删后不再出现在列表里
+    await Repo.instance.deleteStage(broken.id);
+    final s5 = await Repo.instance.stages(c.id, season: 2);
+    expect(s5.any((e) => e.id == broken.id), isFalse);
+    expect(s5.length, 1);
+  });
+
+  // ---------------- v1.7：一次记多批次（opId / 未施） ----------------
+  test('记一笔多批次：同 opId，未选的批次记成未施', () async {
+    final b1 = await makeBatch('施用A', id: 'b_op_a');
+    final b2 = await makeBatch('施用B', id: 'b_op_b');
+    final op = 'op_test_1';
+    await Repo.instance.saveRecord(
+      GardenRecord(
+        id: 'op_r1',
+        batchId: b1.id,
+        type: '施药',
+        date: todayStr(),
+        title: '白粉病预防',
+        opId: op,
+        opSkipped: [b2.id],
+      ),
+    );
+    await Repo.instance.saveRecord(
+      GardenRecord(
+        id: 'op_r2',
+        batchId: b2.id,
+        type: '施药',
+        date: todayStr(),
+        title: '白粉病预防',
+        opId: op,
+        opSkipped: [b2.id],
+      ),
+    );
+
+    final byOp = await Repo.instance.recordsByOp(op);
+    expect(byOp.length, 2);
+    expect(byOp.first.opSkipped, [b2.id]);
+
+    final recent = await Repo.instance.recordsSince(7);
+    final mine = recent.where((e) => e.opId == op).toList();
+    expect(mine.length, 2);
+
+    final names = await Repo.instance.batchNames();
+    expect(names[b1.id], '施用A');
+  });
+
+  // ---------------- v1.7：施用方式多选 ----------------
+  test('肥料可存多种施用方式，老记录只有单值时自动兼容', () async {
+    final m = Supply(
+      id: 'mat_multi',
+      kind: 'fertilizer',
+      name: '测试复合肥',
+      ratio: '1:1000',
+      method: '灌根',
+      methods: ['灌根', '喷雾'],
+    );
+    await Repo.instance.saveMaterial(m);
+    final back = (await Repo.instance.materialById('mat_multi'))!;
+    expect(back.effMethods, ['灌根', '喷雾']);
+    expect(back.methodsText, '灌根、喷雾');
+
+    // 老数据：methods 为空 → 回落到单值 method
+    final old = Supply(id: 'mat_old', kind: 'medicine', name: '老药', method: '喷雾（叶背）');
+    await Repo.instance.saveMaterial(old);
+    final oldBack = (await Repo.instance.materialById('mat_old'))!;
+    expect(oldBack.effMethods, ['喷雾（叶背）']);
+    expect(oldBack.methodsText, '喷雾（叶背）');
+
+    // 记录里的产品也能带多方式
+    final p = RecordProduct(
+      name: '测试复合肥',
+      dosage: '1:1000',
+      method: '灌根',
+      methods: ['灌根', '喷雾'],
+    );
+    final b = await makeBatch('方式测试');
+    await Repo.instance.saveRecord(
+      GardenRecord(
+        id: 'rec_multi',
+        batchId: b.id,
+        type: '施肥',
+        date: todayStr(),
+        title: '冲肥',
+        products: [p],
+      ),
+    );
+    final recs = await Repo.instance.records(batchId: b.id);
+    final got = recs.firstWhere((e) => e.id == 'rec_multi');
+    expect(got.products.first.effMethods, ['灌根', '喷雾']);
+  });
+
+  // ---------------- v1.7：导出 schemaVersion 5 ----------------
+  test('导出文件 schemaVersion 为 5，并带季与 opId', () async {
+    await makeBatch('导出v5');
+    final f = await Transfer.instance.buildFile('garden');
+    expect(f['schemaVersion'], 5);
+    final batches = (f['batches'] as List).cast<Map>();
+    expect(batches.any((e) => e.containsKey('season')), isTrue);
+    final records = (f['records'] as List).cast<Map>();
+    expect(records.any((e) => e.containsKey('opId')), isTrue);
+
+    final st = await Transfer.instance.buildFile('stage');
+    expect(st['schemaVersion'], 5);
+    final crops = (st['crops'] as List).cast<Map>();
+    expect(crops.any((e) => e['seasons'] is List), isTrue);
   });
 
   tearDownAll(() async {

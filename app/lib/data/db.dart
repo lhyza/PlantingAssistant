@@ -20,7 +20,7 @@ class Db {
     final path = p.join(dir.path, 'planting.db');
     _db = await openDatabase(
       path,
-      version: 8,
+      version: 10,
       onUpgrade: (d, oldV, newV) async {
         if (oldV < 2) {
           await d.execute('ALTER TABLE crops ADD COLUMN image TEXT');
@@ -31,7 +31,7 @@ class Db {
           } catch (_) {}
           await d.execute('''CREATE TABLE IF NOT EXISTS materials(
         id TEXT PRIMARY KEY, kind TEXT, name TEXT, ratio TEXT, method TEXT,
-        notes TEXT, image TEXT, scope TEXT, disabledCrops TEXT,
+        methods TEXT, notes TEXT, image TEXT, scope TEXT, disabledCrops TEXT,
         incomplete INTEGER DEFAULT 0, source TEXT,
         sortOrder INTEGER DEFAULT 0, rev INTEGER DEFAULT 1,
         createdAt TEXT, updatedAt TEXT, deletedAt TEXT)''');
@@ -127,6 +127,40 @@ class Db {
             "WHERE (crops IS NULL OR crops = '') AND crop IS NOT NULL",
           );
         }
+        if (oldV < 9) {
+          // v1.7：多季 + 一次操作覆盖多批次
+          for (final sql in [
+            "ALTER TABLE crops ADD COLUMN seasons TEXT",
+            "ALTER TABLE stages ADD COLUMN season INTEGER DEFAULT 0",
+            "ALTER TABLE batches ADD COLUMN season INTEGER DEFAULT 0",
+            "ALTER TABLE records ADD COLUMN opId TEXT DEFAULT ''",
+            "ALTER TABLE records ADD COLUMN opSkipped TEXT",
+            "ALTER TABLE materials ADD COLUMN methods TEXT",
+          ]) {
+            try {
+              await d.execute(sql);
+            } catch (_) {}
+          }
+          await d.execute(
+            'CREATE INDEX IF NOT EXISTS idx_rec_date ON records(date)',
+          );
+          // 回填：现有作物 = 单季（起始日沿用 cycleStart）
+          final crops = await d.query('crops');
+          for (final c in crops) {
+            final start = (c['cycleStart'] ?? '').toString();
+            final row = {
+              'idx': 1,
+              'name': (c['lifeCycle'] ?? 'annual') == 'perennial' ? '本季' : '本季',
+              'start': start,
+            };
+            await d.update(
+              'crops',
+              {'seasons': jsonEncode([row])},
+              where: 'id = ?',
+              whereArgs: [c['id']],
+            );
+          }
+        }
       },
       onConfigure: (d) async {
         await d.execute('PRAGMA foreign_keys = OFF');
@@ -144,7 +178,8 @@ class Db {
       '''CREATE TABLE crops(
         id TEXT PRIMARY KEY, name TEXT, emoji TEXT, color TEXT,
         lifeCycle TEXT, cycleStart TEXT, unit TEXT, isDefault INTEGER DEFAULT 0,
-        enabled INTEGER DEFAULT 1, image TEXT, sortOrder INTEGER DEFAULT 0, rev INTEGER DEFAULT 1,
+        enabled INTEGER DEFAULT 1, image TEXT, seasons TEXT,
+        sortOrder INTEGER DEFAULT 0, rev INTEGER DEFAULT 1,
         createdAt TEXT, updatedAt TEXT, deletedAt TEXT)''',
       '''CREATE TABLE varieties(
         id TEXT PRIMARY KEY, crop TEXT, name TEXT, category TEXT, characteristics TEXT,
@@ -166,7 +201,8 @@ class Db {
         incomplete INTEGER DEFAULT 0, source TEXT, sortOrder INTEGER DEFAULT 0,
         rev INTEGER DEFAULT 1, createdAt TEXT, updatedAt TEXT, deletedAt TEXT)''',
       '''CREATE TABLE stages(
-        id TEXT PRIMARY KEY, crop TEXT, name TEXT, sortOrder INTEGER DEFAULT 0,
+        id TEXT PRIMARY KEY, crop TEXT, season INTEGER DEFAULT 0, name TEXT,
+        sortOrder INTEGER DEFAULT 0,
         startDay INTEGER DEFAULT 0, endDay INTEGER DEFAULT 0, color TEXT,
         fertilizerPlan TEXT, pestControl TEXT, operationTips TEXT,
         rev INTEGER DEFAULT 1, createdAt TEXT, updatedAt TEXT, deletedAt TEXT)''',
@@ -178,7 +214,8 @@ class Db {
         createdAt TEXT, updatedAt TEXT, deletedAt TEXT)''',
       '''CREATE TABLE batches(
         id TEXT PRIMARY KEY, crop TEXT, name TEXT, variety TEXT, varietyId TEXT,
-        plantDate TEXT, cycleStartDate TEXT, location TEXT, potCount INTEGER DEFAULT 1,
+        plantDate TEXT, cycleStartDate TEXT, season INTEGER DEFAULT 0,
+        location TEXT, potCount INTEGER DEFAULT 1,
         status TEXT, color TEXT, notes TEXT, sortOrder INTEGER DEFAULT 0,
         growthOffsetDays INTEGER DEFAULT 0, stuntedSince TEXT,
         photoMode TEXT DEFAULT 'batch', archived INTEGER DEFAULT 0,
@@ -187,7 +224,8 @@ class Db {
         id TEXT PRIMARY KEY, batchId TEXT, type TEXT, date TEXT, title TEXT,
         productName TEXT, dosage TEXT, method TEXT, products TEXT, images TEXT,
         potIndex INTEGER DEFAULT 0, imgW INTEGER DEFAULT 0, imgH INTEGER DEFAULT 0,
-        notes TEXT, stageId TEXT, reminderId TEXT, rev INTEGER DEFAULT 1,
+        notes TEXT, stageId TEXT, reminderId TEXT,
+        opId TEXT DEFAULT '', opSkipped TEXT, rev INTEGER DEFAULT 1,
         createdAt TEXT, updatedAt TEXT, deletedAt TEXT)''',
       '''CREATE TABLE reminders(
         id TEXT PRIMARY KEY, batchId TEXT, kind TEXT, title TEXT,
@@ -198,6 +236,7 @@ class Db {
         deletedAt TEXT)''',
       '''CREATE TABLE materials(
         id TEXT PRIMARY KEY, kind TEXT, name TEXT, ratio TEXT, method TEXT,
+        methods TEXT,
         notes TEXT, image TEXT, scope TEXT, disabledCrops TEXT,
         incomplete INTEGER DEFAULT 0, source TEXT,
         sortOrder INTEGER DEFAULT 0, rev INTEGER DEFAULT 1,
@@ -214,6 +253,7 @@ class Db {
       'CREATE INDEX idx_rem_stage ON stage_reminders(stageId)',
       'CREATE INDEX idx_batch_crop ON batches(crop)',
       'CREATE INDEX idx_rec_batch ON records(batchId)',
+      'CREATE INDEX idx_rec_date ON records(date)',
       'CREATE INDEX idx_mat_kind ON materials(kind)',
       'CREATE INDEX idx_pot_batch ON pots(batchId)',
       'CREATE INDEX idx_rem_batch ON reminders(batchId)',
@@ -385,6 +425,9 @@ class Db {
     'color': m['color'] ?? '#4A7FC0',
     'lifeCycle': m['lifeCycle'] ?? 'annual',
     'cycleStart': m['cycleStart'] ?? '',
+    'seasons': m['seasons'] is String
+        ? m['seasons']
+        : jsonEncode(m['seasons'] ?? const []),
     'unit': m['unit'] ?? '盆',
     'isDefault': m['isDefault'] == true || m['isDefault'] == 1 ? 1 : 0,
     'enabled': m['enabled'] == false ? 0 : 1,
@@ -466,6 +509,7 @@ class Db {
   Map<String, dynamic> _stageRow(Map<String, dynamic> m) => {
     'id': m['id'],
     'crop': m['crop'] ?? '',
+    'season': (m['season'] as num?)?.toInt() ?? 0,
     'name': m['name'] ?? '',
     'sortOrder': m['sortOrder'] ?? 0,
     'startDay': m['startDay'] ?? 0,
@@ -508,6 +552,7 @@ class Db {
     'varietyId': m['varietyId'] ?? '',
     'plantDate': m['plantDate'] ?? '',
     'cycleStartDate': m['cycleStartDate'] ?? '',
+    'season': (m['season'] as num?)?.toInt() ?? 0,
     'location': m['location'] ?? '',
     'potCount': m['potCount'] ?? 1,
     'status': m['status'] ?? '进行中',
@@ -554,6 +599,10 @@ class Db {
     'notes': m['notes'] ?? '',
     'stageId': m['stageId'] ?? '',
     'reminderId': m['reminderId'] ?? '',
+    'opId': m['opId'] ?? '',
+    'opSkipped': m['opSkipped'] is String
+        ? m['opSkipped']
+        : jsonEncode(m['opSkipped'] ?? const []),
     'rev': m['rev'] ?? 1,
     'createdAt': m['createdAt'] ?? '',
     'updatedAt': m['updatedAt'] ?? '',
@@ -566,6 +615,9 @@ class Db {
     'name': m['name'] ?? '',
     'ratio': m['ratio'] ?? '',
     'method': m['method'] ?? '灌根',
+    'methods': m['methods'] is String
+        ? m['methods']
+        : jsonEncode(m['methods'] ?? const []),
     'notes': m['notes'] ?? '',
     'image': m['image'] ?? '',
     'scope': m['scope'] ?? 'common',

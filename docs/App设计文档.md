@@ -1,6 +1,6 @@
 # 种植助手 · App 设计文档
 
-> 版本 1.4.0 ｜ 数据库 schema v8 ｜ 数据文件 schemaVersion 4 ｜ 2026-11-23
+> 版本 1.8.0 ｜ 数据库 schema v10 ｜ 数据文件 schemaVersion 5 ｜ 2026-11-24
 > 配套源码：`../app/`（Flutter 3.50 / Dart 3.14）
 
 ---
@@ -136,6 +136,10 @@ erDiagram
 
 > **v1.4 新增列**：`reminders.groupId`（多批次提醒共用的组号）、`pests.crops`（JSON 数组，一病可绑多作物）、
 > `varieties.imgPending` / `pests.imgPending`（AI 导入后"待裁剪"标记，列表缩略图显示橙色「!」）。
+>
+> **v1.7 新增列**：`crops.seasons`（JSON 数组，1~3 季，每季 `{idx,name,start}`）、`stages.season`、`batches.season`、
+> `records.opId` / `records.opSkipped`（一次操作覆盖哪些批次、漏了哪些）、`materials.methods`（施用方式可多选的 JSON 数组）；
+> 另加索引 `idx_rec_date` 支撑「近 7 天」查询。
 
 > 所有业务表都带 `rev INTEGER`、`createdAt/updatedAt/deletedAt TEXT`；删除一律**软删除**（写 `deletedAt`），页面查询过滤 `deletedAt IS NULL`。这样才能把"删除"同步进导出文件而不复活。
 
@@ -151,6 +155,7 @@ erDiagram
 | `isDefault` | 默认作物（草莓），**不可删除、不可改生命周期** |
 | `enabled` | 停用后按规则从今天/批次页隐藏（见 4.7） |
 | `image` | 默认图（知识库条目缺图时兜底），相对 `images/` 路径 |
+| `seasons` | **v1.7**：JSON 数组 `[{idx:1,name:"夏果季",start:"03-01"},{idx:2,…}]`；空 = 单季，回落成「本季 + cycleStart」 |
 
 #### varieties / pests / soils / materials（四类知识库）
 
@@ -380,6 +385,50 @@ SQL 侧用 `crops LIKE '%"$cropId"%'` 匹配 JSON 数组。新增条目默认绑
 
 ---
 
+### 4.12 多季作物（v1.7）
+
+多年生作物一年可能结两三次果（葡萄夏果/秋果、无花果夏果/秋果），所以「季」是一条独立维度：
+
+```
+作物 ── seasons[]（1~3 季，每季有名称 + 起始 MM-DD）
+        └── 阶段（stages.season = 季序号，从 0 开始）
+批次 ── season（选第几季）+ cycleStartDate（保存时按季起始日同步）
+```
+
+- **季挂在作物上，不是挂品种**：同一个品种南北差异就建两个作物（「葡萄（广西双季）」「葡萄（山东单季）」），比在品种上加"地区"更简单，也不用改品种表。
+- 一年生作物锁 1 季（`lifeCycle == 'annual'` 时季配置不可编辑）。
+- 阶段按季隔离：`stages(cropId, season: b.season)`；该季还没配阶段时**回落到第 1 季**，避免界面空白。
+- 「从上一季复制」：`copySeasonStages(crop, from, to)` 连阶段带提醒模板一起复制，新 id 按季内序号生成（`crop_x_s02_1`），用户复制完再改，比从零配 6 个阶段快得多。
+- 进度按季基准日算：
+
+```dart
+DateTime batchBaseDate(Batch b) {
+  if (crop.isPerennial) {
+    final mmdd = b.season > 0 ? crop.seasons[b.season].start : b.cycleStartDate;
+    var base = DateTime(now.year, mm, dd);
+    if (base.isAfter(now)) base = DateTime(now.year - 1, mm, dd);
+    return base;
+  }
+  return parseDay(b.plantDate);
+}
+```
+
+- 进入下一季：`nextSeason(b, {season})` —— 切季（或指定季）、重置 `cycleStartDate` / `growthOffsetDays` / `stuntedSince`、停用单次提醒、写一条「开启{季名}」记录；单季作物等价于原来的「开启新一年」。
+
+### 4.13 一次操作覆盖多个批次（v1.7）
+
+记一笔可以勾多个批次，每个批次各写一条记录，但共享一个 `opId`；同一作物里**没勾**的批次写进 `opSkipped`（只写在任意一条上即可）：
+
+```
+opId = newId('op')            // 一次操作一个号
+records[i].opId = opId
+records[0].opSkipped = [未选批次 id…]
+```
+
+- 今天页「近 7 天操作」按 `opId` 合并成一行：`施用：阳台花架、露台大盆 / 未施：北阳台`。
+- 没勾的批次不是"漏记"，而是"这次没做"，所以用快照而不是推断——之后回看就知道哪盆漏了。
+- 查询入口：`recordsSince(days)`（按 `date >=` 过滤）、`recordsByOp(opId)`、`batchNames()`（id→名称映射）。
+
 ## 5. 页面与交互
 
 ### 5.1 导航
@@ -517,20 +566,22 @@ graph LR
 {
   "format": "planting.data",
   "kind": "variety",
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "libraryId": "lib_variety_3c07a1b2",
   "name": "品种库",
   "updatedAt": "2026-11-21T17:20:00+08:00",
   "revision": 12,
-  "appVersion": "1.4.0",
+  "appVersion": "1.8.0",
   "count": 20,
   "items": [ { "id": "var_xxx", "rev": 3, "updatedAt": "…", "deletedAt": null, … } ]
 }
 ```
 
-- `format` 不匹配 / `kind` 不匹配 / `schemaVersion > 4` → 直接拒绝并提示。
+- `format` 不匹配 / `kind` 不匹配 / `schemaVersion > 5` → 直接拒绝并提示。
 - `schemaVersion < 3` → 自动迁移（补 `potIndex/imgW/imgH`、`photoMode`、`pots[]`）。
 - `schemaVersion < 4` → 补 `reminders[].groupId`、`pests[].crops`、`imgPending`。
+- `schemaVersion < 5` → 补 `crops[].seasons`（默认 1 季）、`stages[].season`、`batches[].season`、
+  `records[].opId/opSkipped`、`materials[].methods`（老单值 `method` 转成单元素数组）。
 - `garden` 不用 `items`，而是 `batches[] / records[] / reminders[] / pots[]`。
 - 条目公共字段：`id`、`rev`、`createdAt`、`updatedAt`、`deletedAt`（墓碑）、`sortOrder`。
 
@@ -663,11 +714,11 @@ apksigner verify --print-certs app-release.apk      # 签名
 
 | 文件 | 覆盖 |
 | --- | --- |
-| `test/data_test.dart` | 种子灌入、阶段推算（一年生/多年生/跨年）、提醒生成与幂等、完成顺延、盆位生成与"全灭才冻结"、按盆拍照计数与最新一张、删除记录清图片、导出 schemaVersion 4 结构（含 pots/potIndex/groupId/crops）、肥料库增删查与多产品记录、病虫害按作物过滤、多批次提醒合并与整组取消、AI 提示词字段约定 |
+| `test/data_test.dart` | 种子灌入、阶段推算（一年生/多年生/跨年）、提醒生成与幂等、完成顺延、盆位生成与"全灭才冻结"、按盆拍照计数与最新一张、删除记录清图片、导出 schemaVersion 5 结构（含 pots/potIndex/groupId/crops/seasons/opId）、肥料库增删查与多产品记录、病虫害按作物过滤、多批次提醒合并与整组取消、AI 提示词字段约定、**多季阶段与切季基准日 / opId 与未施快照 / 施用方式多选与旧数据兼容** |
 | `test/ui_smoke_test.dart` | 首屏渲染、4 个 Tab 存在、进入「关于」不崩 |
 | `test/shot_test.dart` | `RepaintBoundary.toImage` 导出真实界面截图（用于文档） |
 
-共 **20 个用例**；`flutter analyze` 0 error（余下为 `material.dart` 弃用等 info）。
+共 **41 个用例**；`flutter analyze` 0 error（余下为 `material.dart` 弃用等 info）。
 
 数据库测试用 `sqflite_common_ffi` 在桌面跑真实 SQLite，并注入假的 `PathProviderPlatform` 指向临时目录。
 
@@ -690,6 +741,11 @@ apksigner verify --print-certs app-release.apk      # 签名
 5. 补一条测试。
    
 导出文件靠 `schemaVersion` 演进：新增可选字段不需要升版本，**语义变化/新集合**才升。
+
+### 给某个作物加一季
+
+App 内即可：「作物管理 → 该作物 → 一年几季」选 2~3 季并填名称与起始日；再去「生产阶段管理」切到新季，
+点「从上一季复制」把阶段与提醒模板搬过来，本地化调整即可。**不需要改代码**。
 
 ### 加一种记录类型
 
@@ -720,3 +776,7 @@ apksigner verify --print-certs app-release.apk      # 签名
 | 1.2.0 | 拍照记录类型、记录与拍照分区+分页、知识库卡片改版、土肥移后、肥料药品"通用/禁用" |
 | 1.3.0 | 自由/1:1/4:3 裁剪、按盆拍照与首张预览、图片墙、逐盆标记存活/僵苗/死亡与两处计数、拍照模式、停用作物显示规则、导出 schemaVersion 3（含 `pots[]`） |
 | 1.4.0 | 多批次提醒（`groupId` 合并、信息框完成/编辑/取消）、长按菜单中文化、病虫害多作物绑定、药品三行卡、AI 模板与 zip 数据包导入（含「!」待裁剪标记）、关于页更新记录、导出 schemaVersion 4 |
+| 1.5.0 | AI 数据包支持纯 JSON（zip / json 双通道按文件头识别）、导入预览页、通用条目跳过、别名自动合并、JSON 导入不标「!」 |
+| 1.6.0 | 应用内检查更新（GitHub Release + 镜像 + DownloadManager + 五项校验）、病虫害「影响作物」显示修复 |
+| 1.8.0 | 今天页阶段条**标注批次**（多批次可切换、点条体进详情）、修「编辑第 2 季阶段被写回第 1 季」（编辑不改季 + 启动 `normalizeStageSeasons()` 按 id 归位）、阶段**可删除**（连提醒模板软删）、`copySeasonStages` 返回 `(copied, skipped)` 并跳过同名阶段、近 7 天→**近 15 天**、记录行顺序改为 产品→施用→未施→备注、全部记录**不限时间**（30 条/页 + 总数）、记录详情显示施用/未施批次、批次卡标题行合并「批次名 + 状态」 |
+| 1.7.0 | 多季作物（`crops.seasons` / `stages.season` / `batches.season`、从上一季复制、开启新一季）、今天页改「近 7 天操作」、一次操作多批次的 `opId` 与未施快照、施用方式多选、批次行压缩、按钮不换行、通用/禁用标签统一、导出 schemaVersion 5 |

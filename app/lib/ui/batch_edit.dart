@@ -34,6 +34,7 @@ class _BatchEditPageState extends State<BatchEditPage> {
   String color = '#D9534F';
   String plantDate = todayStr();
   String cycleStart = '03-01';
+  int season = 0;
   bool loading = true;
   bool customVariety = false;
 
@@ -65,11 +66,20 @@ class _BatchEditPageState extends State<BatchEditPage> {
       cycleStart = origin!.cycleStartDate.isEmpty
           ? _defaultCycle()
           : origin!.cycleStartDate;
+      season = origin!.season;
     } else {
       cycleStart = _defaultCycle();
     }
     varieties = cropId.isEmpty ? [] : await repo.varieties(cropId);
-    stages = cropId.isEmpty ? [] : await repo.stages(cropId);
+    final n = crop?.seasonCount ?? 1;
+    if (season >= n) season = 0;
+    if (n > 1) {
+      final st = crop!.seasons[season].start;
+      if (st.isNotEmpty) cycleStart = st;
+    }
+    stages = cropId.isEmpty
+        ? []
+        : await repo.stages(cropId, season: n > 1 ? season : null);
     if (stages.isNotEmpty) {
       if (origin != null) {
         final snap = await repo.snapshot(origin!);
@@ -107,6 +117,7 @@ class _BatchEditPageState extends State<BatchEditPage> {
   Future<void> _pickCrop(String id) async {
     setState(() {
       cropId = id;
+      season = 0;
       cycleStart = _defaultCycle();
       customVariety = false;
     });
@@ -134,6 +145,24 @@ class _BatchEditPageState extends State<BatchEditPage> {
       return dateOnly(base);
     }
     return parseDay(plantDate);
+  }
+
+  Future<void> _pickSeason(int i) async {
+    final c = crop;
+    if (c == null) return;
+    setState(() {
+      season = i;
+      final st = c.seasons[i].start;
+      if (st.isNotEmpty) cycleStart = st;
+      loading = true;
+    });
+    stages = await repo.stages(c.id, season: i);
+    setState(() {
+      stageId = stages.isEmpty ? '' : stages.first.id;
+      _elapsed.text = '0';
+      stageTouched = false;
+      loading = false;
+    });
   }
 
   Future<void> _pickStage() async {
@@ -210,6 +239,7 @@ class _BatchEditPageState extends State<BatchEditPage> {
     b.varietyId = vid;
     b.plantDate = perennial ? '' : plantDate;
     b.cycleStartDate = perennial ? cycleStart : '';
+    b.season = (crop?.seasonCount ?? 1) > 1 ? season : 0;
     b.location = _location.text.trim();
     b.potCount = int.tryParse(_pots.text.trim()) ?? 1;
     b.photoMode = photoMode;
@@ -327,6 +357,27 @@ class _BatchEditPageState extends State<BatchEditPage> {
                   Text(
                     '保存后会在品种库里新建「${_variety.text.trim()}」，资料可以之后慢慢补。',
                     style: tTiny.copyWith(color: kAmber),
+                  ),
+                ],
+                if ((crop?.seasonCount ?? 1) > 1 && crop != null) ...[
+                  const FormLabel('这一批是本年第几季', required: true),
+                  Builder(
+                    builder: (ctx) {
+                      final c = crop!;
+                      final labels = [
+                        for (final s in c.seasons) '${s.name} ${s.start}',
+                      ];
+                      return ChoiceRow(
+                        options: labels,
+                        value: labels[season],
+                        onChanged: (v) => _pickSeason(labels.indexOf(v)),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '每季单独一条生长链：阶段按本季起始日推算，季与季之间各算各的。',
+                    style: tTiny,
                   ),
                 ],
                 if (perennial) ...[

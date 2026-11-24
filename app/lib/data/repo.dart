@@ -253,7 +253,11 @@ class Repo {
   }
 
   // ---------------- 阶段 ----------------
-  Future<List<Stage>> stages(String cropId, {bool all = false}) async {
+  Future<List<Stage>> stages(
+    String cropId, {
+    bool all = false,
+    int? season,
+  }) async {
     final d = await _d;
     final rows = await d.query(
       'stages',
@@ -261,7 +265,106 @@ class Repo {
       whereArgs: [cropId],
       orderBy: 'startDay ASC, sortOrder ASC',
     );
-    return rows.map(Stage.fromMap).toList();
+    final list = rows.map(Stage.fromMap).toList();
+    if (season == null) return list;
+    final ofSeason = list.where((e) => e.season == season).toList();
+    if (ofSeason.isNotEmpty) return ofSeason;
+    // 该季还没配阶段 → 回落到第 1 季，避免「一片空白」
+    return list.where((e) => e.season == 0).toList();
+  }
+
+  /// v1.7：把 from 季的阶段（含提醒模板）复制到 to 季
+  /// v1.8：目标季已有同名阶段时跳过，返回 (copied, skipped)
+  Future<({int copied, int skipped})> copySeasonStages(
+    String cropId,
+    int fromSeason,
+    int toSeason,
+  ) async {
+    final all = await stages(cropId);
+    final src = all.where((e) => e.season == fromSeason).toList();
+    final exist = all
+        .where((e) => e.season == toSeason)
+        .map((e) => e.name.trim())
+        .toSet();
+    var copied = 0;
+    var skipped = 0;
+    for (final st in src) {
+      if (exist.contains(st.name.trim())) {
+        skipped++;
+        continue;
+      }
+      final nid = '${cropId}_s${toSeason.toString().padLeft(2, '0')}_'
+          '${copied + 1}';
+      final copy = Stage.fromMap({
+        ...st.toMap(),
+        'id': nid,
+        'season': toSeason,
+        'rev': 1,
+        'createdAt': nowStamp(),
+        'updatedAt': nowStamp(),
+      });
+      await saveStage(copy);
+      for (final t in await stageReminders(st.id)) {
+        await saveStageReminder(
+          StageReminder.fromMap({
+            ...t.toMap(),
+            'id': '${t.id}_c$toSeason',
+            'stageId': nid,
+            'createdAt': nowStamp(),
+            'updatedAt': nowStamp(),
+          }),
+        );
+      }
+      exist.add(st.name.trim());
+      copied++;
+    }
+    return (copied: copied, skipped: skipped);
+  }
+
+  /// v1.8：软删阶段 + 它的提醒模板
+  Future<void> deleteStage(String stageId) async {
+    final d = await _d;
+    final now = nowStamp();
+    await d.update(
+      'stages',
+      {'deletedAt': now, 'updatedAt': now},
+      where: 'id = ?',
+      whereArgs: [stageId],
+    );
+    await d.update(
+      'stage_reminders',
+      {'deletedAt': now, 'updatedAt': now},
+      where: 'stageId = ?',
+      whereArgs: [stageId],
+    );
+  }
+
+  /// v1.8：按 id 里的季序号把错位的阶段归位（v1.7 编辑时没传 season 导致）
+  Future<int> normalizeStageSeasons() async {
+    final d = await _d;
+    final rows = await d.query(
+      'stages',
+      columns: ['id', 'season'],
+      where: 'deletedAt IS NULL',
+    );
+    var n = 0;
+    final re = RegExp(r'_s(\d+)_');
+    for (final r in rows) {
+      final id = r['id'] as String? ?? '';
+      final m = re.firstMatch(id);
+      if (m == null) continue;
+      final want = int.tryParse(m.group(1) ?? '');
+      if (want == null) continue;
+      if ((r['season'] as int? ?? 0) == want) continue;
+      await d.update(
+        'stages',
+        {'season': want, 'updatedAt': nowStamp()},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      n++;
+    }
+    return n;
   }
 
   Future<List<StageReminder>> stageReminders(String stageId) async {
@@ -341,6 +444,15 @@ class Repo {
 
   Future<void> saveBatch(Batch b) async {
     final d = await _d;
+    // v1.7：多季作物 → 本季起始日以季配置为准
+    final crop = await cropById(b.crop);
+    final seasons = crop?.effSeasons ?? const <CropSeason>[];
+    if (seasons.length > 1) {
+      final i = b.season.clamp(0, seasons.length - 1);
+      b.season = i;
+      final st = seasons[i].start;
+      if (st.isNotEmpty) b.cycleStartDate = _normMmdd(st);
+    }
     b.updatedAt = nowStamp();
     b.rev += 1;
     if (b.createdAt.isEmpty) b.createdAt = b.updatedAt;
@@ -788,7 +900,7 @@ class Repo {
   }
 
   Future<StageSnapshot> snapshot(Batch b, {DateTime? today}) async {
-    final list = await stages(b.crop);
+    final list = await stages(b.crop, season: b.season);
     final day = dayInCycle(b, today: today);
     if (list.isEmpty)
       return StageSnapshot(stage: null, dayInCycle: day, dayInStage: 0);
@@ -874,13 +986,20 @@ class Repo {
     await saveBatch(b);
   }
 
-  Future<void> newYear(Batch b) async {
+  /// v1.7：开启新一季（单季作物 = 原来的「开启新一年」）
+  Future<void> nextSeason(Batch b, {int? season}) async {
     final now = dateOnly(DateTime.now());
-    final mmdd = b.cycleStartDate.isEmpty ? '03-01' : b.cycleStartDate;
-    final parts = mmdd.split('-');
-    final m = int.tryParse(parts[0]) ?? 3;
-    final d = int.tryParse(parts.length > 1 ? parts[1] : '1') ?? 1;
-    b.cycleStartDate = '$m-${d.toString().padLeft(2, '0')}';
+    final crop = await cropById(b.crop);
+    final seasons = crop?.effSeasons ?? const <CropSeason>[];
+    if (seasons.length > 1) {
+      final next = season ?? (b.season + 1) % seasons.length;
+      b.season = next.clamp(0, seasons.length - 1);
+      final st = seasons[b.season].start;
+      b.cycleStartDate = st.isEmpty ? b.cycleStartDate : _normMmdd(st);
+    } else {
+      final mmdd = b.cycleStartDate.isEmpty ? '03-01' : b.cycleStartDate;
+      b.cycleStartDate = _normMmdd(mmdd);
+    }
     b.growthOffsetDays = 0;
     b.stuntedSince = null;
     await saveBatch(b);
@@ -891,7 +1010,7 @@ class Repo {
         await saveReminder(r);
       }
     }
-    // 记录本年度启动
+    final label = seasons.length > 1 ? seasons[b.season].name : '新一年';
     final day = daysBetween(batchBaseDate(b, today: now), now) + 1;
     if (day > 0) {
       await saveRecord(
@@ -900,13 +1019,71 @@ class Repo {
           batchId: b.id,
           type: '其他',
           date: fmtDay(now),
-          title: '开启新一年',
-          notes: '本年度萌芽日重置，阶段从第 1 天重新推算',
+          title: seasons.length > 1 ? '开启$label' : '开启新一年',
+          notes: seasons.length > 1
+              ? '基准日重置为 $label，阶段从第 1 天重新推算'
+              : '本年度萌芽日重置，阶段从第 1 天重新推算',
           createdAt: nowStamp(),
           updatedAt: nowStamp(),
         ),
       );
     }
+  }
+
+  Future<void> newYear(Batch b) => nextSeason(b);
+
+  String _normMmdd(String v) {
+    final parts = v.split('-');
+    if (parts.length != 2) return v;
+    final m = int.tryParse(parts[0]);
+    final d = int.tryParse(parts[1]);
+    if (m == null || d == null) return v;
+    return '${m.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
+  }
+
+  // ---------------- 近 7 天记录（v1.7） ----------------
+  Future<List<GardenRecord>> recordsSince(
+    int days, {
+    bool photo = false,
+    int limit = 200,
+  }) async {
+    final d = await _d;
+    final from = fmtDay(dateOnly(DateTime.now().subtract(Duration(days: days - 1))));
+    final rows = await d.query(
+      'records',
+      where: photo
+          ? "deletedAt IS NULL AND type = '拍照' AND date >= ?"
+          : "deletedAt IS NULL AND type <> '拍照' AND date >= ?",
+      whereArgs: [from],
+      orderBy: 'date DESC, createdAt DESC',
+      limit: limit,
+    );
+    return rows.map(GardenRecord.fromMap).toList();
+  }
+
+  /// id → 名称（一次查回，避免 N 次查询）
+  Future<Map<String, String>> batchNames() async {
+    final d = await _d;
+    final rows = await d.query(
+      'batches',
+      columns: ['id', 'name', 'variety'],
+      where: 'deletedAt IS NULL',
+    );
+    return {
+      for (final r in rows)
+        r['id'] as String: (r['name'] ?? '').toString(),
+    };
+  }
+
+  Future<List<GardenRecord>> recordsByOp(String opId) async {
+    final d = await _d;
+    final rows = await d.query(
+      'records',
+      where: 'deletedAt IS NULL AND opId = ?',
+      whereArgs: [opId],
+      orderBy: 'createdAt ASC',
+    );
+    return rows.map(GardenRecord.fromMap).toList();
   }
 
   // ---------------- 元信息与统计 ----------------

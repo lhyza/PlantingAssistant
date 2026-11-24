@@ -8,9 +8,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart' hide Batch;
 
 import 'package:planting/app.dart';
+import 'package:planting/core/util.dart';
+import 'package:planting/data/models.dart';
 import 'package:planting/data/repo.dart';
 
 class _FakePathProvider extends PathProviderPlatform
@@ -59,6 +61,82 @@ Future<void> _shot(WidgetTester tester, String path) async {
   await tester.pump();
 }
 
+
+/// 造一点演示数据，让截图里能看到阶段条、批次卡与记录行。
+/// 只写进测试用的临时数据库，不影响正式 App 的首次启动状态。
+Future<void> _seedDemo() async {
+  final repo = Repo.instance;
+  final crop = (await repo.defaultCrop())!;
+  final today = dateOnly(DateTime.now());
+  String d(int daysAgo) => fmtDay(today.subtract(Duration(days: daysAgo)));
+
+  await repo.saveBatch(Batch(
+    id: 'demo_b1',
+    crop: crop.id,
+    name: '阳台花架',
+    variety: '隋珠',
+    plantDate: d(50),
+    location: '南阳台',
+    potCount: 4,
+    color: '#E8354D',
+    sortOrder: 1,
+  ));
+  await repo.saveBatch(Batch(
+    id: 'demo_b2',
+    crop: crop.id,
+    name: '露台大盆',
+    variety: '红颜',
+    plantDate: d(52),
+    location: '露台',
+    potCount: 6,
+    color: '#2A9D8F',
+    sortOrder: 2,
+  ));
+
+  await repo.saveRecord(GardenRecord(
+    id: 'demo_r1',
+    batchId: 'demo_b1',
+    type: '施药',
+    date: d(0),
+    title: '白粉病预防',
+    products: [
+      RecordProduct(name: '苯醚甲环唑', dosage: '1:1500', method: '喷雾（叶背）'),
+      RecordProduct(name: '吡唑醚菌酯', dosage: '1:2000', method: '喷雾'),
+    ],
+    opId: 'demo_op1',
+    opSkipped: ['demo_b2'],
+    notes: '重点喷叶背',
+  ));
+  await repo.saveRecord(GardenRecord(
+    id: 'demo_r2',
+    batchId: 'demo_b2',
+    type: '施肥',
+    date: d(3),
+    title: '高磷促花肥',
+    products: [
+      RecordProduct(name: '磷酸二氢钾', dosage: '1:1000', method: '灌根'),
+    ],
+    notes: '浇透',
+  ));
+
+  await repo.saveReminder(Reminder(
+    id: 'demo_m1',
+    batchId: 'demo_b2',
+    kind: '施药',
+    title: '白粉病预防',
+    intervalDays: 10,
+    nextDueAt: d(2),
+  ));
+  await repo.saveReminder(Reminder(
+    id: 'demo_m2',
+    batchId: 'demo_b1',
+    kind: '施肥',
+    title: '高磷促花肥',
+    intervalDays: 7,
+    nextDueAt: d(0),
+  ));
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory tmp;
@@ -69,6 +147,7 @@ void main() {
     tmp = await Directory.systemTemp.createTemp('planting_shot');
     PathProviderPlatform.instance = _FakePathProvider(tmp.path);
     await Repo.instance.crops();
+    await _seedDemo();
     await _loadFonts();
   });
 

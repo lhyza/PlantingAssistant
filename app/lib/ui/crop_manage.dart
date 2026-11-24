@@ -31,7 +31,7 @@ class _CropListPageState extends State<CropListPage> {
     final sc = <String, int>{};
     for (final c in cs) {
       bc[c.id] = (await Repo.instance.batches(cropId: c.id)).length;
-      sc[c.id] = (await Repo.instance.stages(c.id, all: true)).length;
+      sc[c.id] = (await Repo.instance.stages(c.id)).length;
     }
     if (mounted) {
       setState(() {
@@ -73,7 +73,7 @@ class _CropListPageState extends State<CropListPage> {
                   return Padding(
                     padding: const EdgeInsets.only(top: 10),
                     child: Text(
-                      '想加蓝莓、番茄、辣椒？点右上「新增」填个名字就行，阶段和提醒自己配。',
+                      '想加蓝莓、番茄、辣椒？点右上「新增」填个名字就行，阶段和提醒自己配。葡萄/树莓这类一年多季的，把「一年几季」设成 2 或 3。',
                       style: tTiny,
                     ),
                   );
@@ -138,8 +138,10 @@ class _CropListPageState extends State<CropListPage> {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                '${c.isPerennial ? '多年生' : '一年生'} · 计「${c.unit}」 · '
-                                '${stageCounts[c.id] ?? 0} 个阶段 · ${batchCounts[c.id] ?? 0} 个批次',
+                                '${c.isPerennial ? '多年生' : '一年生'}'
+                                '${c.seasonCount > 1 ? ' · ${c.seasonCount} 季' : ''}'
+                                ' · 计「${c.unit}」 · ${stageCounts[c.id] ?? 0} 个阶段'
+                                ' · ${batchCounts[c.id] ?? 0} 个批次',
                                 style: tSub,
                               ),
                             ],
@@ -172,6 +174,9 @@ class _CropEditPageState extends State<CropEditPage> {
   Crop? origin;
   bool perennial = false;
   bool enabled = true;
+  int seasonCount = 1;
+  final List<_SeasonEdit> seasons = [];
+  bool seasonsTouched = false;
   String color = kColors[4];
   bool loading = true;
 
@@ -192,6 +197,11 @@ class _CropEditPageState extends State<CropEditPage> {
         _unit.text = o.unit;
         perennial = o.isPerennial;
         enabled = o.enabled;
+        final eff = o.effSeasons;
+        seasonCount = o.seasonCount;
+        seasons
+          ..clear()
+          ..addAll(eff.map((e) => _SeasonEdit(e.idx, e.name, e.start)));
         image = o.image;
         if (o.color.isNotEmpty) color = o.color;
       }
@@ -209,12 +219,74 @@ class _CropEditPageState extends State<CropEditPage> {
     c.emoji = _emoji.text.trim().isEmpty ? '🌱' : _emoji.text.trim();
     c.lifeCycle = perennial ? 'perennial' : 'annual';
     c.cycleStart = perennial ? _cycle.text.trim() : '';
+    if (perennial && seasonCount > 1) {
+      c.seasons = [
+        for (var i = 0; i < seasonCount; i++)
+          CropSeason(
+            idx: i + 1,
+            name: (i < seasons.length ? seasons[i].name.text.trim() : ''),
+            start: (i < seasons.length ? seasons[i].start.text.trim() : ''),
+          ),
+      ];
+    } else {
+      c.seasons = [];
+    }
     c.unit = _unit.text.trim().isEmpty ? '盆' : _unit.text.trim();
     c.color = color;
     c.enabled = enabled;
     c.image = image;
     await Repo.instance.saveCrop(c);
     if (mounted) Navigator.pop(context);
+  }
+
+  void _syncSeasons() {
+    while (seasons.length < seasonCount) {
+      final i = seasons.length + 1;
+      final last = seasons.isEmpty
+          ? ''
+          : seasons.last.start.text.trim();
+      seasons.add(_SeasonEdit(i, '$i 季', last));
+    }
+    while (seasons.length > seasonCount) {
+      seasons.removeLast();
+    }
+  }
+
+  Widget _seasonRow(int i) {
+    final row = seasons[i];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 26,
+            child: Text('${i + 1}', style: tSub),
+          ),
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: row.name,
+              decoration: InputDecoration(
+                hintText: i == 0 ? '夏果季' : '秋果季',
+                isDense: true,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 92,
+            child: TextField(
+              controller: row.start,
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                hintText: '03-01',
+                isDense: true,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _remove() async {
@@ -305,14 +377,42 @@ class _CropEditPageState extends State<CropEditPage> {
                       : (s) => setState(() => perennial = s.first),
                 ),
                 if (perennial) ...[
-                  const FormLabel('每年萌芽/开始日'),
-                  TextField(
-                    controller: _cycle,
-                    decoration: const InputDecoration(
-                      hintText: 'MM-DD，如 03-01',
-                    ),
+                  const FormLabel('一年几季'),
+                  SegmentedButton<int>(
+                    segments: const [
+                      ButtonSegment(value: 1, label: Text('1 季')),
+                      ButtonSegment(value: 2, label: Text('2 季')),
+                      ButtonSegment(value: 3, label: Text('3 季')),
+                    ],
+                    selected: {seasonCount},
+                    onSelectionChanged: isDefault
+                        ? null
+                        : (v) => setState(() {
+                            seasonCount = v.first;
+                            _syncSeasons();
+                          }),
                   ),
-                  Text('多年生作物按「今年这个日期」开始新一轮，休眠期后可点「开启新一年」重置。', style: tTiny),
+                  if (seasonCount == 1) ...[
+                    const FormLabel('每年萌芽/开始日'),
+                    TextField(
+                      controller: _cycle,
+                      decoration: const InputDecoration(
+                        hintText: 'MM-DD，如 03-01',
+                      ),
+                    ),
+                    Text(
+                      '多年生作物按「今年这个日期」开始新一轮，休眠期后可点「开启新一季」重置。',
+                      style: tTiny,
+                    ),
+                  ] else ...[
+                    FormLabel('每季名称与起始日（共 $seasonCount 季）', required: true),
+                    for (var i = 0; i < seasonCount; i++) _seasonRow(i),
+                    const SizedBox(height: 4),
+                    Text(
+                      '日期格式 MM-DD；每年到这一天算「本季第 1 天」。不同地区季数不同时，建议直接建两个作物（如「葡萄（北方单季）」「葡萄（广西双季）」）。',
+                      style: tTiny,
+                    ),
+                  ],
                 ],
                 const FormLabel('计数单位'),
                 TextField(
@@ -374,4 +474,15 @@ class _CropEditPageState extends State<CropEditPage> {
             ),
     );
   }
+}
+
+class _SeasonEdit {
+  _SeasonEdit(int idx, String name, String start)
+    : _idx = idx,
+      name = TextEditingController(text: name),
+      start = TextEditingController(text: start);
+
+  final int _idx;
+  final TextEditingController name;
+  final TextEditingController start;
 }

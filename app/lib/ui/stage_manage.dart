@@ -18,8 +18,10 @@ class StageListPage extends StatefulWidget {
 class _StageListPageState extends State<StageListPage> {
   List<Crop> crops = [];
   String cropId = 'crop_strawberry';
+  List<Stage> allStages = [];
   List<Stage> stages = [];
   Map<String, int> counts = {};
+  int season = 0;
   bool loading = true;
 
   @override
@@ -39,17 +41,49 @@ class _StageListPageState extends State<StageListPage> {
   }
 
   Future<void> _loadStages() async {
-    final ss = await Repo.instance.stages(cropId, all: true);
+    final ss = await Repo.instance.stages(cropId);
     final m = <String, int>{};
     for (final s in ss) {
       m[s.id] = await Repo.instance.stageReminderCount(s.id);
     }
+    // 作物换季了/季被删了 → 回到第 1 季
+    final crop = crops.where((c) => c.id == cropId).firstOrNull;
+    final n = crop?.seasonCount ?? 1;
+    if (season >= n) season = 0;
+    final list = n <= 1
+        ? ss
+        : ss.where((e) => e.season == season).toList();
     if (mounted) {
       setState(() {
-        stages = ss;
+        allStages = ss;
+        stages = list;
         counts = m;
         loading = false;
       });
+    }
+  }
+
+  Future<void> _copyFromPrev(Crop crop) async {
+    if (season <= 0) {
+      toast(context, '第 1 季没有上一季可复制');
+      return;
+    }
+    final ok = await confirm(
+      context,
+      '从「${crop.seasons[season - 1].name}」复制阶段？',
+      body: '会把上一季的阶段和提醒模板整套复制过来，已在目标季的阶段不会被覆盖。',
+      ok: '复制',
+    );
+    if (!ok) return;
+    final r = await Repo.instance.copySeasonStages(cropId, season - 1, season);
+    await _loadStages();
+    if (!mounted) return;
+    if (r.copied == 0) {
+      toast(context, '这套阶段已经在当前季了，没有复制');
+    } else if (r.skipped > 0) {
+      toast(context, '已复制 ${r.copied} 个阶段，跳过 ${r.skipped} 个同名阶段');
+    } else {
+      toast(context, '已复制 ${r.copied} 个阶段');
     }
   }
 
@@ -93,10 +127,52 @@ class _StageListPageState extends State<StageListPage> {
                               onSelected: (_) {
                                 setState(() {
                                   cropId = c.id;
+                                  season = 0;
                                   loading = true;
                                 });
                                 _loadStages();
                               },
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                if ((crop?.seasonCount ?? 1) > 1)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (var i = 0; i < crop!.seasons.length; i++)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: ChoiceChip(
+                                      label: Text(
+                                        '${crop.seasons[i].name} '
+                                        '${crop.seasons[i].start}',
+                                      ),
+                                      selected: season == i,
+                                      onSelected: (_) {
+                                        setState(() => season = i);
+                                        _loadStages();
+                                      },
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (season > 0)
+                          TextButton.icon(
+                            onPressed: () => _copyFromPrev(crop!),
+                            icon: const Icon(Icons.copy_all_outlined, size: 15),
+                            label: const Text(
+                              '从上一季复制',
+                              style: TextStyle(fontSize: 12),
                             ),
                           ),
                       ],
@@ -108,7 +184,9 @@ class _StageListPageState extends State<StageListPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          '${crop?.emoji ?? ''} ${crop?.name ?? ''} · ${stages.length} 个阶段',
+                          '${crop?.emoji ?? ''} ${crop?.name ?? ''}'
+                          '${(crop?.seasonCount ?? 1) > 1 ? ' · ${crop!.seasons[season].name}' : ''}'
+                          ' · ${stages.length} 个阶段',
                           style: const TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w700,
@@ -126,6 +204,7 @@ class _StageListPageState extends State<StageListPage> {
                               builder: (_) => StageEditPage(
                                 cropId: cropId,
                                 cropUnit: crop?.unit ?? '盆',
+                                season: season,
                               ),
                             ),
                           );
@@ -160,6 +239,7 @@ class _StageListPageState extends State<StageListPage> {
                                       stageId: s.id,
                                       cropId: cropId,
                                       cropUnit: crop?.unit ?? '盆',
+                                      season: s.season,
                                     ),
                                   ),
                                 );
@@ -223,10 +303,12 @@ class StageEditPage extends StatefulWidget {
     this.stageId,
     required this.cropId,
     this.cropUnit = '盆',
+    this.season = 0,
   });
   final String? stageId;
   final String cropId;
   final String cropUnit;
+  final int season;
   @override
   State<StageEditPage> createState() => _StageEditPageState();
 }
@@ -291,9 +373,28 @@ class _StageEditPageState extends State<StageEditPage> {
     s.pestControl = _pest.text.trim();
     s.operationTips = _tips.text.trim();
     s.color = color;
+    s.season = origin?.season ?? widget.season;
     await Repo.instance.saveStage(s);
     if (!mounted) return;
     Navigator.pop(context);
+  }
+
+  Future<void> _delete() async {
+    final o = origin;
+    if (o == null) return;
+    final ok = await confirm(
+      context,
+      '删除「${o.name}」？',
+      body: '这个阶段和它的 ${templates.length} 条提醒模板都会被删掉；'
+          '已经生成过的提醒和记录不受影响。',
+      ok: '删除',
+      danger: true,
+    );
+    if (!ok) return;
+    await Repo.instance.deleteStage(o.id);
+    if (!mounted) return;
+    Navigator.pop(context);
+    toast(context, '已删除阶段');
   }
 
   Future<void> _editTemplate([StageReminder? t]) async {
@@ -322,6 +423,12 @@ class _StageEditPageState extends State<StageEditPage> {
       appBar: AppBar(
         title: Text(widget.stageId == null ? '新增阶段' : '阶段设置'),
         actions: [
+          if (widget.stageId != null)
+            IconButton(
+              tooltip: '删除阶段',
+              onPressed: loading ? null : _delete,
+              icon: const Icon(Icons.delete_outline, color: kRedDeep),
+            ),
           TextButton(
             onPressed: loading ? null : _save,
             child: const Text(

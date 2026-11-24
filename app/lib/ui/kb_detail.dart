@@ -1038,12 +1038,12 @@ class _MaterialDetailPageState extends State<MaterialDetailPage> {
                   children: [
                     if (x.ratio.isNotEmpty)
                       Pill('兑水 ${x.ratio}', bg: kBlueBg, fg: kBlue),
-                    Pill(x.method, bg: kGreenBg, fg: kGreen),
-                    if (x.scope == 'disabled' && x.disabledCrops.isNotEmpty)
-                      Pill(_scopeText(x.disabledCrops, crops),
-                          bg: kAmberBg, fg: kAmber)
-                    else
-                      const Pill('通用', bg: kGreenBg, fg: kGreen),
+                    if (x.methodsText.isNotEmpty)
+                      Pill(x.methodsText, bg: kGreenBg, fg: kGreen),
+                    ScopeTag(
+                      text: _scopeText(x.disabledCrops, crops),
+                      off: x.scope == 'disabled' && x.disabledCrops.isNotEmpty,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -1075,7 +1075,7 @@ class _MaterialEditPageState extends State<MaterialEditPage> {
   final _notes = TextEditingController();
   Supply? origin;
   String image = '';
-  String method = '灌根';
+  final Set<String> methods = {'灌根'};
   String scope = 'common';
   final Set<String> disabledCrops = {};
   List<Crop> crops = [];
@@ -1105,7 +1105,9 @@ class _MaterialEditPageState extends State<MaterialEditPage> {
         _ratio.text = o.ratio;
         _notes.text = o.notes;
         image = o.image;
-        method = o.method.isEmpty ? '灌根' : o.method;
+        methods
+          ..clear()
+          ..addAll(o.effMethods);
         scope = o.scope;
         disabledCrops
           ..clear()
@@ -1125,7 +1127,8 @@ class _MaterialEditPageState extends State<MaterialEditPage> {
     final m = origin ?? Supply(id: newId('mat'), kind: widget.kind);
     m.name = _name.text.trim();
     m.ratio = _ratio.text.trim();
-    m.method = method;
+    m.methods = methods.toList();
+    m.method = methods.isEmpty ? '灌根' : methods.first;
     m.notes = _notes.text.trim();
     m.image = image;
     if (scope == 'disabled' && disabledCrops.isEmpty) {
@@ -1225,13 +1228,43 @@ class _MaterialEditPageState extends State<MaterialEditPage> {
                     );
                   }).toList(),
                 ),
-                const FormLabel('方式'),
-                ChoiceRow(
-                  options: Supply.kMethods,
-                  value: method,
-                  onChanged: (v) => setState(() => method = v),
-                  compact: true,
+                const FormLabel('施用方式（可多选）'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: Supply.kMethods.map((k) {
+                    final on = methods.contains(k);
+                    return GestureDetector(
+                      onTap: () => setState(() {
+                        if (on) {
+                          methods.remove(k);
+                        } else {
+                          methods.add(k);
+                        }
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: on ? kGreenBg : Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: on ? kGreen : kLine),
+                        ),
+                        child: Text(
+                          k,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: on ? kGreen : kInk2,
+                            fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
+                Text('都可以时全选，记一笔会自动带上这几项。', style: tTiny),
                 const FormLabel('适用范围'),
                 ChoiceRow(
                   options: const ['通用', '禁用'],

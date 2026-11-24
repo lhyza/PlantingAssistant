@@ -241,10 +241,44 @@ class _BatchListPageState extends State<BatchListPage> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      b.name,
-                      style: tTitle,
-                      overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            b.name,
+                            style: tTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (b.status.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            b.status,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: kInk3,
+                            ),
+                          ),
+                        ],
+                        if (b.location.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              b.location,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: kInk3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   PopupMenuButton<String>(
@@ -282,13 +316,6 @@ class _BatchListPageState extends State<BatchListPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${b.variety.isEmpty ? '未填品种' : b.variety} · ${b.location.isEmpty ? '未填位置' : b.location}'
-                      '${b.status.isEmpty ? '' : ' · ${b.status}'}',
-                      style: tSub,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,

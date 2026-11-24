@@ -116,14 +116,21 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
                   if (mounted) Navigator.pop(context);
                 }
               } else if (v == 'newyear') {
+                final multi = (crop?.seasonCount ?? 1) > 1;
+                final cs = crop?.seasons ?? const <CropSeason>[];
+                final nextName = multi
+                    ? cs[(batch.season + 1) % cs.length].name
+                    : '';
                 final ok = await confirm(
                   context,
-                  '开启新一年？',
-                  body: '会把「本年度开始日」重置为今天，阶段从第 1 天重新算，旧的记录保留。',
+                  multi ? '开启「$nextName」？' : '开启新一年？',
+                  body: multi
+                      ? '会把本季基准日切到「$nextName」的起始日，阶段从第 1 天重新算，旧的记录保留。'
+                      : '会把「本年度开始日」重置为今天，阶段从第 1 天重新算，旧的记录保留。',
                   danger: false,
                 );
                 if (ok) {
-                  await repo.newYear(batch);
+                  await repo.nextSeason(batch);
                   bump();
                   _load();
                 }
@@ -131,7 +138,12 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
             },
             itemBuilder: (_) => [
               if (crop?.isPerennial == true)
-                const PopupMenuItem(value: 'newyear', child: Text('开启新一年')),
+                PopupMenuItem(
+                  value: 'newyear',
+                  child: Text(
+                    (crop?.seasonCount ?? 1) > 1 ? '开启新一季' : '开启新一年',
+                  ),
+                ),
               const PopupMenuItem(value: 'delete', child: Text('删除批次')),
             ],
           ),
@@ -206,6 +218,24 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
                       : '种植第 ${snap?.dayInCycle ?? 0} 天 · 定植 ${batch.plantDate}',
                   style: tSub,
                 ),
+                if ((crop?.seasonCount ?? 1) > 1) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Pill(
+                        '${crop!.seasons[batch.season].name}'
+                        '（第 ${batch.season + 1} 季）',
+                        bg: kGreenBg,
+                        fg: kGreen,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '起始 ${crop!.seasons[batch.season].start}',
+                        style: tTiny,
+                      ),
+                    ],
+                  ),
+                ],
                 if (batch.notes.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(batch.notes, style: tSub),
@@ -291,10 +321,16 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
                     );
                     _load();
                   },
-                  icon: const Icon(Icons.local_florist_outlined, size: 18),
-                  label: const Text('标记死亡/僵苗'),
+                  icon: const Icon(Icons.local_florist_outlined, size: 16),
+                  label: const Text(
+                    '死亡/僵苗',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 13),
+                  ),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
                   ),
                 ),
               ),
@@ -312,9 +348,17 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
                       );
                     }
                   },
-                  icon: const Icon(Icons.auto_awesome, size: 17),
-                  label: const Text('生成阶段提醒'),
-                  style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                  icon: const Icon(Icons.auto_awesome, size: 16),
+                  label: const Text(
+                    '生成阶段提醒',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                  ),
                 ),
               ),
             ],

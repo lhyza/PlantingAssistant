@@ -228,6 +228,45 @@ Future<void> quickRecord(BuildContext context) async {
                     ],
                   ),
                 ),
+                if (picked.isNotEmpty && picked.length > 1) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+                    decoration: BoxDecoration(
+                      color: kGreenBg,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '施用 $pickedCount 个批次：'
+                          '${batches.where((b) => picked.contains(b.id)).map((b) => b.name).join('、')}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: kGreen,
+                            height: 1.45,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (batches.any((b) => !picked.contains(b.id)))
+                          Text(
+                            '未施 ${batches.where((b) => !picked.contains(b.id)).length} 个批次：'
+                            '${batches.where((b) => !picked.contains(b.id)).map((b) => b.name).join('、')}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: kAmber,
+                              height: 1.45,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
@@ -415,6 +454,7 @@ class _RecordEditPageState extends State<RecordEditPage> {
             name: e.data.name.trim(),
             dosage: e.data.dosage.trim(),
             method: e.data.method,
+            methods: e.data.effMethods,
           ),
         )
         .where((e) => e.name.isNotEmpty || e.dosage.isNotEmpty)
@@ -434,11 +474,25 @@ class _RecordEditPageState extends State<RecordEditPage> {
     final targets = batchList.isEmpty
         ? widget.batchIds
         : batchList.map((b) => b.id).toList();
+    // 一次记录多个批次 → 同一个 opId；同作物里没勾的批次记为「未施」
+    final opId = targets.length > 1 ? newId('op') : '';
+    final skipped = <String>[];
+    if (opId.isNotEmpty) {
+      final cropsInvolved = batchList.map((b) => b.crop).toSet();
+      for (final c in cropsInvolved) {
+        final all = await repo.batches(cropId: c);
+        for (final b in all) {
+          if (!targets.contains(b.id)) skipped.add(b.id);
+        }
+      }
+    }
     GardenRecord? last;
     for (final id in targets) {
       final r = GardenRecord(id: newId('rec'), batchId: id);
       _fill(r, title, items);
       r.stageId = stageIds[id] ?? '';
+      r.opId = opId;
+      r.opSkipped = sketchSkipped(skipped);
       await repo.saveRecord(r);
       last = r;
     }
@@ -446,6 +500,9 @@ class _RecordEditPageState extends State<RecordEditPage> {
     if (!mounted) return;
     Navigator.pop(context, last);
   }
+
+  /// 未施批次只可能来自「同作物的其它批次」，这里做一次去重即可
+  List<String> sketchSkipped(List<String> ids) => [...ids.toSet()];
 
   void _fill(GardenRecord r, String title, List<RecordProduct> items) {
     r.type = normRecordType(type);
@@ -524,19 +581,19 @@ class _RecordEditPageState extends State<RecordEditPage> {
                           subtitle: Text(
                             [
                               if (m.ratio.isNotEmpty) '兑水 ${m.ratio}',
-                              m.method,
+                              m.methodsText,
                             ].join(' · '),
                             style: tTiny,
                           ),
                           onTap: () {
                             row.data.name = m.name;
                             row.data.dosage = m.ratio;
-                            row.data.method = m.method;
+                            row.data.methods = m.effMethods;
+                            row.data.method = m.effMethods.isEmpty
+                                ? m.method
+                                : m.effMethods.first;
                             row.name.text = m.name;
                             row.dosage.text = m.ratio;
-                            if (Supply.kMethods.contains(m.method)) {
-                              row.data.method = m.method;
-                            }
                             Navigator.pop(ctx);
                             setState(() {});
                           },
@@ -614,21 +671,46 @@ class _RecordEditPageState extends State<RecordEditPage> {
                   onChanged: (v) => row.data.dosage = v,
                 ),
               ),
-              const SizedBox(width: 10),
-              DropdownButton<String>(
-                value: Supply.kMethods.contains(row.data.method)
-                    ? row.data.method
-                    : Supply.kMethods.first,
-                underline: const SizedBox(),
-                style: const TextStyle(fontSize: 13, color: kInk),
-                items: Supply.kMethods
-                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                    .toList(),
-                onChanged: (v) => setState(
-                  () => row.data.method = v ?? row.data.method,
-                ),
-              ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: Supply.kMethods.map((m) {
+              final on = row.data.effMethods.contains(m);
+              return GestureDetector(
+                onTap: () => setState(() {
+                  final next = [...row.data.effMethods];
+                  if (on) {
+                    next.remove(m);
+                  } else {
+                    next.add(m);
+                  }
+                  row.data.methods = next;
+                  row.data.method = next.isEmpty ? '' : next.first;
+                }),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: on ? kGreenBg : Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: on ? kGreen : kLine),
+                  ),
+                  child: Text(
+                    m,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: on ? kGreen : kInk3,
+                      fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

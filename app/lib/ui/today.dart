@@ -8,6 +8,7 @@ import '../data/repo.dart';
 import '../data/update_controller.dart';
 import 'app_state.dart';
 import 'batch_detail.dart';
+import 'record_list.dart';
 import 'reminder_sheet.dart';
 import 'update_page.dart';
 
@@ -22,9 +23,11 @@ class _TodayPageState extends State<TodayPage> {
   List<Crop> crops = [];
   List<Batch> batches = [];
   List<ReminderGroup> groups = [];
+  List<GardenRecord> recent = [];
   Map<String, String> batchNames = {};
   Map<String, StageSnapshot> snaps = {};
   String cropId = '';
+  String stripBatchId = '';
   bool loading = true;
 
   @override
@@ -52,6 +55,7 @@ class _TodayPageState extends State<TodayPage> {
     // 提醒跨作物共享，批次名要从全部批次里查，否则其它作物的提醒会显示成「批次」
     final all = await repo.batches();
     final rs = await repo.reminders();
+    final rq = await repo.recordsSince(15, limit: 60);
     final map = <String, StageSnapshot>{};
     for (final b in bs) {
       map[b.id] = await repo.snapshot(b);
@@ -63,6 +67,7 @@ class _TodayPageState extends State<TodayPage> {
       batches = bs;
       batchNames = {for (final b in all) b.id: b.name};
       groups = groupReminders(rs);
+      recent = rq;
       snaps = map;
       loading = false;
     });
@@ -91,7 +96,6 @@ class _TodayPageState extends State<TodayPage> {
     return dt != null && dt.difference(DateTime.now()).inDays <= 3;
   }).toList();
 
-  @override
   Widget _updateBanner() {
     final c = UpdateController.instance;
     final v = c.info?.version ?? '';
@@ -212,7 +216,10 @@ class _TodayPageState extends State<TodayPage> {
                       padding: const EdgeInsets.only(right: 8),
                       child: GestureDetector(
                         onTap: () {
-                          setState(() => cropId = c.id);
+                          setState(() {
+                            cropId = c.id;
+                            stripBatchId = '';
+                          });
                           _load();
                         },
                         child: Container(
@@ -267,90 +274,210 @@ class _TodayPageState extends State<TodayPage> {
               ...soon.take(5).map((r) => _reminderCard(r, dim: true)),
             ],
             SectionTitle(
-              '我的${crop?.name ?? ''}',
-              count: batches.length,
-              trailing: Text(
-                '${batches.fold<int>(0, (a, b) => a + b.potCount)} ${crop?.unit ?? '盆'}',
-                style: tTiny,
+              '近 15 天操作',
+              count: recent.length,
+              trailing: TextButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RecordListPage(
+                      photo: false,
+                      mergeOps: true,
+                      title: '全部操作记录',
+                    ),
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: kInk2,
+                ),
+                child: const Text('全部记录 ›', style: TextStyle(fontSize: 12)),
               ),
             ),
-            if (batches.isEmpty)
-              EmptyHint(text: '还没有 ${crop?.name ?? ''} 批次，点右下角「记一笔」或去批次页新建')
+            if (recent.isEmpty)
+              const EmptyHint(text: '最近 15 天还没有记录，点右下角「记一笔」')
             else
-              ...batches.map((b) => _batchCard(b)),
-            const SizedBox(height: 8),
-            _othersRow(),
+              ..._recentTiles(),
           ],
         ),
       ),
     );
   }
 
+  /// 顶部阶段条当前展示的批次：先看用户点选，再看有没有当天/逾期提醒，
+  /// 最后回落到本季开始日最新的一批（幼苗期最需要盯）。
+  Batch? get _stripBatch {
+    if (batches.isEmpty) return null;
+    for (final b in batches) {
+      if (b.id == stripBatchId) return b;
+    }
+    final urgent = <String>{};
+    for (final g in [...overdue, ...dueToday]) {
+      for (final r in g.items) {
+        urgent.add(r.batchId);
+      }
+    }
+    for (final b in batches) {
+      if (urgent.contains(b.id)) return b;
+    }
+    var best = batches.first;
+    var bestD = repo.batchBaseDate(best);
+    for (final b in batches.skip(1)) {
+      final d = repo.batchBaseDate(b);
+      if (d.isAfter(bestD)) {
+        best = b;
+        bestD = d;
+      }
+    }
+    return best;
+  }
+
   Widget _stageStrip() {
-    if (batches.isEmpty) return const SizedBox.shrink();
-    final b = batches.first;
+    final b = _stripBatch;
+    if (b == null) return const SizedBox.shrink();
     final s = snaps[b.id];
     final stage = s?.stage;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [kGreen.withValues(alpha: 0.10), kGreenBg],
+    final seasonName = (crop?.seasonCount ?? 1) > 1 && b.season > 0
+        ? crop!.effSeasons[b.season - 1].name
+        : '';
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => BatchDetailPage(batchId: b.id)),
+        );
+        _load();
+      },
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 11, 12, 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [kGreen.withValues(alpha: 0.10), kGreenBg],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: kGreen.withValues(alpha: 0.18)),
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kGreen.withValues(alpha: 0.18)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(crop?.emoji ?? '🌿', style: const TextStyle(fontSize: 15)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  stage == null ? '还没有配置阶段' : stage.name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: kGreen,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(crop?.emoji ?? '🌿', style: const TextStyle(fontSize: 13)),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    b.name,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF5E8A78),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
+                if (stage != null)
+                  Pill(
+                    '第 ${s!.dayInStage}/${stage.days} 天',
+                    bg: Colors.white,
+                    fg: kGreen,
+                    border: kGreen.withValues(alpha: 0.25),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    stage == null
+                        ? '还没有配置阶段'
+                        : (seasonName.isEmpty
+                              ? stage.name
+                              : '$seasonName · ${stage.name}'),
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: kGreen,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            if (stage != null && stage.operationTips.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                stage.operationTips.split('\n').first,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFF3F6355),
+                  height: 1.5,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              if (stage != null)
-                Pill(
-                  '第 ${s!.dayInStage}/${stage.days} 天',
-                  bg: Colors.white,
-                  fg: kGreen,
-                  border: kGreen.withValues(alpha: 0.25),
-                ),
             ],
-          ),
-          if (stage != null && stage.operationTips.isNotEmpty) ...[
-            const SizedBox(height: 7),
-            Text(
-              stage.operationTips.split('\n').first,
-              style: const TextStyle(
-                fontSize: 12.5,
-                color: Color(0xFF3F6355),
-                height: 1.5,
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: stage == null
+                    ? 0
+                    : (s!.dayInStage / stage.days).clamp(0.0, 1.0),
+                minHeight: 5,
+                backgroundColor: Colors.white.withValues(alpha: 0.7),
+                valueColor: const AlwaysStoppedAnimation(kGreen),
               ),
             ),
+            if (batches.length > 1) ...[
+              const SizedBox(height: 9),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final x in batches)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 7),
+                        child: GestureDetector(
+                          onTap: () => setState(() => stripBatchId = x.id),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: x.id == b.id
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: x.id == b.id
+                                    ? kGreen.withValues(alpha: 0.55)
+                                    : kGreen.withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Text(
+                              '${x.name}  ${snaps[x.id]?.stage?.name ?? '未配阶段'}',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: x.id == b.id
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: x.id == b.id
+                                    ? kGreen
+                                    : const Color(0xFF5E8A78),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ],
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: stage == null
-                  ? 0
-                  : (s!.dayInStage / stage.days).clamp(0.0, 1.0),
-              minHeight: 5,
-              backgroundColor: Colors.white.withValues(alpha: 0.7),
-              valueColor: const AlwaysStoppedAnimation(kGreen),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -446,6 +573,42 @@ class _TodayPageState extends State<TodayPage> {
     );
   }
 
+  List<Widget> _recentTiles() {
+    final map = <String, List<GardenRecord>>{};
+    final order = <String>[];
+    for (final r in recent) {
+      final key = r.opId.isEmpty ? 'one:${r.id}' : r.opId;
+      if (!map.containsKey(key)) {
+        map[key] = [];
+        order.add(key);
+      }
+      map[key]!.add(r);
+    }
+    return [
+      for (final k in order.take(6))
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RecordDetailPage(
+                  items: map[k]!,
+                  index: 0,
+                  batchNames: batchNames,
+                ),
+              ),
+            ),
+            child: OpRecordTile(
+              records: map[k]!,
+              batchNames: batchNames,
+            ),
+          ),
+        ),
+    ];
+  }
+
   Widget _othersRow() {
     final others = crops.where((c) => c.id != cropId).toList();
     if (others.isEmpty) return const SizedBox.shrink();
@@ -461,7 +624,10 @@ class _TodayPageState extends State<TodayPage> {
                 avatar: Text(c.emoji),
                 label: Text(c.name, style: tSub),
                 onPressed: () {
-                  setState(() => cropId = c.id);
+                  setState(() {
+                    cropId = c.id;
+                    stripBatchId = '';
+                  });
                   _load();
                 },
               ),

@@ -10,8 +10,8 @@ import '../data/db.dart';
 import 'models.dart';
 import 'repo.dart';
 
-const String kFormat = 'caomeiyuan.data';
-const int kSchema = 4;
+const String kFormat = 'planting.data';
+const int kSchema = 5;
 const String kAppVersion = '1.0.0';
 
 const Map<String, String> kKindNames = {
@@ -106,6 +106,7 @@ class Transfer {
                 'varietyName': b.variety,
                 'plantDate': b.plantDate,
                 'cycleStartDate': b.cycleStartDate,
+                'season': b.season,
                 'location': b.location,
                 'potCount': b.potCount,
                 'status': b.status,
@@ -141,6 +142,8 @@ class Transfer {
                 'imgH': r.imgH,
                 'notes': r.notes,
                 'stageId': r.stageId,
+                'opId': r.opId,
+                'opSkipped': r.opSkipped,
               },
             )
             .toList();
@@ -239,6 +242,7 @@ class Transfer {
                 'color': c.color,
                 'lifeCycle': c.lifeCycle,
                 'cycleStart': c.cycleStart,
+                'seasons': c.effSeasons.map((e) => e.toMap()).toList(),
                 'unit': c.unit,
                 'isDefault': c.isDefault ? 1 : 0,
                 'enabled': c.enabled ? 1 : 0,
@@ -899,6 +903,9 @@ class Transfer {
     'color': m['color'] ?? '#4A7FC0',
     'lifeCycle': m['lifeCycle'] ?? 'annual',
     'cycleStart': m['cycleStart'] ?? '',
+    'seasons': m['seasons'] is String
+        ? m['seasons']
+        : jsonEncode(m['seasons'] ?? const []),
     'unit': m['unit'] ?? '盆',
     'isDefault': m['isDefault'] == true || m['isDefault'] == 1 ? 1 : 0,
     'enabled': m['enabled'] == false ? 0 : 1,
@@ -921,6 +928,7 @@ class Transfer {
     'varietyId': m['varietyId'] ?? '',
     'plantDate': m['plantDate'] ?? '',
     'cycleStartDate': m['cycleStartDate'] ?? '',
+    'season': (m['season'] as num?)?.toInt() ?? 0,
     'location': m['location'] ?? '',
     'potCount': m['potCount'] ?? 1,
     'status': m['status'] ?? '进行中',
@@ -943,6 +951,9 @@ class Transfer {
     'name': m['name'] ?? '',
     'ratio': m['ratio'] ?? '',
     'method': m['method'] ?? '灌根',
+    'methods': m['methods'] is String
+        ? m['methods']
+        : jsonEncode(m['methods'] ?? const []),
     'notes': m['notes'] ?? '',
     'image': m['image'] ?? '',
     'incomplete': m['incomplete'] == true || m['incomplete'] == 1 ? 1 : 0,
@@ -984,6 +995,10 @@ class Transfer {
     'notes': m['notes'] ?? '',
     'stageId': m['stageId'] ?? '',
     'reminderId': m['reminderId'] ?? '',
+    'opId': m['opId'] ?? '',
+    'opSkipped': m['opSkipped'] is String
+        ? m['opSkipped']
+        : jsonEncode(m['opSkipped'] ?? const []),
     'rev': m['rev'] ?? 1,
     'createdAt': m['createdAt'] ?? '',
     'updatedAt': m['updatedAt'] ?? '',

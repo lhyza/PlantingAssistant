@@ -29,6 +29,8 @@ Future<void> main() async {
     await Repo.instance.crops();
     // 历史数据里的 pests.crops 可能存了中文作物名，归一成 id（幂等）
     await Repo.instance.normalizePestCrops();
+    // v1.7 编辑阶段时漏传 season，可能把阶段存进了别的季：按 id 归位（幂等）
+    await Repo.instance.normalizeStageSeasons();
   } catch (e, st) {
     debugPrint('db init failed: $e\n$st');
   }

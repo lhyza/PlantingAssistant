@@ -237,3 +237,21 @@ class AutoField extends StatelessWidget {
     );
   }
 }
+
+/// 肥料/药品的适用范围标签：列表与详情用同一个组件，字体与配色完全一致
+class ScopeTag extends StatelessWidget {
+  const ScopeTag({super.key, required this.text, this.off = false});
+  final String text;
+
+  /// true = 禁用（琥珀），false = 通用（绿）
+  final bool off;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pill(
+      text,
+      bg: off ? kAmberBg : kGreenBg,
+      fg: off ? kAmber : kGreen,
+    );
+  }
+}
