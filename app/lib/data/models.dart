@@ -47,6 +47,7 @@ class Crop {
     this.isDefault = false,
     this.enabled = true,
     this.image = '',
+    this.iconImage = '',
     this.sortOrder = 0,
     this.rev = 1,
     this.createdAt = '',
@@ -65,6 +66,9 @@ class Crop {
   bool isDefault;
   bool enabled;
   String image;
+
+  /// 作物图标（相对路径，存进 images/ 的小图）；为空时用 emoji
+  String iconImage;
   int sortOrder;
   int rev;
   String createdAt;
@@ -93,6 +97,7 @@ class Crop {
     'isDefault': isDefault ? 1 : 0,
     'enabled': enabled ? 1 : 0,
     'image': image,
+    'iconImage': iconImage,
     'sortOrder': sortOrder,
     'rev': rev,
     'createdAt': createdAt,
@@ -112,6 +117,7 @@ class Crop {
     isDefault: (m['isDefault'] ?? 0) == 1,
     enabled: (m['enabled'] ?? 1) == 1,
     image: m['image'] as String? ?? '',
+    iconImage: m['iconImage'] as String? ?? '',
     sortOrder: m['sortOrder'] as int? ?? 0,
     rev: m['rev'] as int? ?? 1,
     createdAt: m['createdAt'] as String? ?? '',
@@ -970,7 +976,7 @@ class Supply {
   /// 旧字段：第一个方式（兼容老数据/导出）
   String method;
 
-  /// v1.7：施用方式可多选（灌根 / 喷雾 / 喷雾（叶背））
+  /// v1.7：施用方式可多选（灌根 / 喷雾 / 喷雾(叶背)）
   List<String> methods;
   String notes;
   String image;
@@ -984,7 +990,7 @@ class Supply {
   String updatedAt;
   String? deletedAt;
 
-  static const kMethods = ['灌根', '喷雾', '喷雾（叶背）'];
+  static const kMethods = ['灌根', '喷雾', '喷雾(叶背)'];
 
   /// 有效方式：methods 优先，空则回落到 method
   List<String> get effMethods {
@@ -1141,3 +1147,85 @@ List<String> _strList(dynamic v) {
   } catch (_) {}
   return [t];
 }
+
+/// 提醒历史：一次「完成」动作写一条（不管涉及几个批次）
+class ReminderLog {
+  ReminderLog({
+    required this.id,
+    this.groupId = '',
+    this.kind = '其他',
+    this.title = '',
+    this.notes = '',
+    this.doneAt = '',
+    this.nextDueAt = '',
+    this.batches = const [],
+    this.createdAt = '',
+  });
+
+  final String id;
+  final String groupId;
+  final String kind;
+  final String title;
+  final String notes;
+
+  /// 完成日 yyyy-MM-dd
+  final String doneAt;
+
+  /// 完成后顺延到的日期；一次性提醒为空
+  final String nextDueAt;
+
+  /// 快照：[{"id":"b1","name":"阳台花架"}]
+  final List<Map<String, String>> batches;
+  final String createdAt;
+
+  String get batchNames => batches.map((e) => e['name'] ?? '').join('、');
+
+  bool get isOneTime => nextDueAt.isEmpty;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'groupId': groupId,
+        'kind': kind,
+        'title': title,
+        'notes': notes,
+        'doneAt': doneAt,
+        'nextDueAt': nextDueAt,
+        'batches': batches,
+        'createdAt': createdAt,
+      };
+
+  static List<Map<String, String>> batchesOf(dynamic v) {
+    if (v is List) {
+      return [
+        for (final e in v)
+          if (e is Map)
+            {
+              'id': (e['id'] ?? '').toString(),
+              'name': (e['name'] ?? '').toString(),
+            },
+      ];
+    }
+    if (v is String && v.trim().isNotEmpty) {
+      try {
+        final list = (const JsonDecoder().convert(v) as List);
+        return batchesOf(list);
+      } catch (_) {
+        return const [];
+      }
+    }
+    return const [];
+  }
+
+  factory ReminderLog.fromMap(Map<String, dynamic> m) => ReminderLog(
+        id: (m['id'] ?? '').toString(),
+        groupId: (m['groupId'] ?? '').toString(),
+        kind: (m['kind'] ?? '其他').toString(),
+        title: (m['title'] ?? '').toString(),
+        notes: (m['notes'] ?? '').toString(),
+        doneAt: (m['doneAt'] ?? '').toString(),
+        nextDueAt: (m['nextDueAt'] ?? '').toString(),
+        batches: batchesOf(m['batches']),
+        createdAt: (m['createdAt'] ?? '').toString(),
+      );
+}
+

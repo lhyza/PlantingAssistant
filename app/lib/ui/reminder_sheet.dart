@@ -303,6 +303,14 @@ class _ReminderSheet extends StatelessWidget {
     for (final r in list) {
       await Repo.instance.completeReminder(r, doneAt: done);
     }
+    // 一次「完成」动作只记一条历史（批次是快照）
+    await Repo.instance.logReminderDone(
+      items: list,
+      done: done,
+      nextDueAt: list.any((r) => r.isOneTime) && list.length == 1
+          ? ''
+          : list.first.nextDueAt,
+    );
     await Notify.instance.reschedule();
     bump();
     onChanged?.call();

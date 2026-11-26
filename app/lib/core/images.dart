@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -42,6 +43,51 @@ class Images {
   }
 
   /// 存为文件并返回相对路径；失败返回空串
+  /// 图标用途的小图：等比缩进 size×size 方框（透明底），存成 PNG。
+  /// 作物图标只有十几到几十像素，没必要留原图。
+  static Future<String> saveScaled(Uint8List bytes, {int size = 128}) async {
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final src = frame.image;
+      final recorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(recorder);
+      final long = src.width > src.height ? src.width : src.height;
+      final scale = size / long;
+      final w = src.width * scale;
+      final h = src.height * scale;
+      canvas.drawImageRect(
+        src,
+        ui.Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()),
+        ui.Rect.fromLTWH((size - w) / 2, (size - h) / 2, w, h),
+        ui.Paint()..filterQuality = ui.FilterQuality.high,
+      );
+      final out = await recorder.endRecording().toImage(size, size);
+      final data = await out.toByteData(format: ui.ImageByteFormat.png);
+      src.dispose();
+      out.dispose();
+      if (data == null) return '';
+      return save(data.buffer.asUint8List(), ext: 'png');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// 把已存的文件压到 size，成功后删掉原文件；失败保留原文件并返回空串
+  static Future<String> shrinkTo(String ref, {int size = 128}) async {
+    final path = pathOf(ref);
+    if (path == null) return '';
+    try {
+      final bytes = await File(path).readAsBytes();
+      final out = await saveScaled(bytes, size: size);
+      if (out.isEmpty) return '';
+      if (out != ref) await remove(ref);
+      return out;
+    } catch (_) {
+      return '';
+    }
+  }
+
   static Future<String> saveDataUri(String uri) async {
     try {
       final comma = uri.indexOf(',');

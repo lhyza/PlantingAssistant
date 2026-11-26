@@ -11,6 +11,7 @@ import '../data/models.dart';
 import '../data/repo.dart';
 import 'ai_preview_page.dart';
 import 'common.dart';
+import 'image_tile.dart';
 
 /// AI 模板页：选作物 → 贴链接 → 生成提示词 → 复制给 AI → 回来导入 zip。
 class AiTemplatePage extends StatefulWidget {
@@ -205,8 +206,9 @@ class _AiTemplatePageState extends State<AiTemplatePage> {
                       color: on ? col.withValues(alpha: .45) : kLine,
                     ),
                   ),
-                  child: Text(
-                    '${c.emoji} ${c.name}',
+                  child: cropLabel(
+                    c,
+                    size: 15,
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: on ? FontWeight.w700 : FontWeight.w500,

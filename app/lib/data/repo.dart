@@ -340,6 +340,35 @@ class Repo {
   }
 
   /// v1.8：按 id 里的季序号把错位的阶段归位（v1.7 编辑时没传 season 导致）
+  /// v1.8.4：把历史数据里的「喷雾（叶背）」统一成半角括号（幂等）。
+  Future<int> normalizeMethodNames() async {
+    const old = '喷雾（叶背）';
+    const neu = '喷雾(叶背)';
+    final d = await _d;
+    var n = 0;
+    n += await d.rawUpdate(
+      "UPDATE materials SET method = REPLACE(method, ?, ?) "
+      "WHERE method LIKE '%' || ? || '%'",
+      [old, neu, old],
+    );
+    n += await d.rawUpdate(
+      "UPDATE materials SET methods = REPLACE(methods, ?, ?) "
+      "WHERE methods LIKE '%' || ? || '%'",
+      [old, neu, old],
+    );
+    n += await d.rawUpdate(
+      "UPDATE records SET method = REPLACE(method, ?, ?) "
+      "WHERE method LIKE '%' || ? || '%'",
+      [old, neu, old],
+    );
+    n += await d.rawUpdate(
+      "UPDATE records SET products = REPLACE(products, ?, ?) "
+      "WHERE products LIKE '%' || ? || '%'",
+      [old, neu, old],
+    );
+    return n;
+  }
+
   Future<int> normalizeStageSeasons() async {
     final d = await _d;
     final rows = await d.query(
@@ -534,6 +563,127 @@ class Repo {
     return rows.map(Pot.fromMap).toList();
   }
 
+  /// 整盆死光的批次：所有未删除的盆都是 dead。
+  Future<Set<String>> deadBatchIds() async {
+    final d = await _d;
+    final rows = await d.rawQuery(
+      "SELECT batchId FROM pots WHERE deletedAt IS NULL "
+      "GROUP BY batchId "
+      "HAVING SUM(CASE WHEN state = 'dead' THEN 1 ELSE 0 END) = COUNT(*)",
+    );
+    return {for (final r in rows) r['batchId']! as String};
+  }
+
+  /// 「未施」候选：这次没处理到的批次。
+  ///
+  /// [targets] 是本次操作涉及的批次；[crops] 是参与作物；
+  /// [acrossCrops] 为真时候选包含其它作物的批次（默认，见显示设置）。
+  /// 整盆死光的批次永远不进候选。
+  Future<List<String>> skipCandidates({
+    required Set<String> targets,
+    Set<String> crops = const {},
+    bool acrossCrops = true,
+  }) async {
+    final dead = await deadBatchIds();
+    final pool = <Batch>[];
+    if (acrossCrops) {
+      pool.addAll(await batches());
+    } else {
+      for (final c in crops) {
+        pool.addAll(await batches(cropId: c));
+      }
+    }
+    final out = <String>[];
+    for (final b in pool) {
+      if (targets.contains(b.id) || dead.contains(b.id)) continue;
+      out.add(b.id);
+    }
+    return out;
+  }
+
+  /// 一条记录该带哪些「未施」批次。
+  ///
+  /// 只有 施肥/施药/浇水 才有「未施」；拍照、其他记录返回空。
+  Future<List<String>> skippedForRecord({
+    required String type,
+    required Set<String> targets,
+    Set<String> crops = const {},
+    bool acrossCrops = true,
+  }) async {
+    final t = normRecordType(type);
+    if (t != '施肥' && t != '施药' && t != '浇水') return const [];
+    return skipCandidates(
+      targets: targets,
+      crops: crops,
+      acrossCrops: acrossCrops,
+    );
+  }
+
+  /// 回填 v1.9 之前的记录：老记录没有 opSkipped，按当时的批次列表补一份快照。
+  ///
+  /// 只处理最近 [days] 天、`opSkipped` 为空的 施肥/施药/浇水 记录；
+  /// 候选批次用「创建时间不晚于记录日期」近似“当时已存在”，并排除归档与整盆死光。
+  Future<int> backfillOpSkipped({int days = 30, bool acrossCrops = true}) async {
+    final d = await _d;
+    final from = fmtDay(
+      dateOnly(DateTime.now().subtract(Duration(days: days - 1))),
+    );
+    final rows = await d.query(
+      'records',
+      where:
+          "deletedAt IS NULL AND date >= ? AND (opSkipped IS NULL OR opSkipped = '') "
+          "AND type IN ('施肥','施药','浇水')",
+      whereArgs: [from],
+      orderBy: 'date ASC',
+    );
+    if (rows.isEmpty) return 0;
+
+    final dead = await deadBatchIds();
+    final allBatches = (await batches()).where((b) => !dead.contains(b.id));
+    final byId = {for (final b in allBatches) b.id: b};
+
+    // 同 opId 的记录属于同一次操作
+    final groups = <String, List<GardenRecord>>{};
+    for (final m in rows) {
+      final r = GardenRecord.fromMap(m);
+      final key = r.opId.isEmpty ? 'single:${r.id}' : 'op:${r.opId}';
+      groups.putIfAbsent(key, () => []).add(r);
+    }
+
+    var changed = 0;
+    for (final list in groups.values) {
+      final targets = list.map((e) => e.batchId).toSet();
+      final crops = <String>{};
+      for (final id in targets) {
+        final b = byId[id];
+        if (b != null) crops.add(b.crop);
+      }
+      final day = list.first.date; // yyyy-MM-dd
+      final skipped = <String>{};
+      for (final b in allBatches) {
+        if (targets.contains(b.id)) continue;
+        if (!acrossCrops && !crops.contains(b.crop)) continue;
+        final bornDay =
+          b.createdAt.length >= 10 ? b.createdAt.substring(0, 10) : '';
+        if (bornDay.isNotEmpty && bornDay.compareTo(day) > 0) continue;
+        skipped.add(b.id);
+      }
+      final value = skipped.isEmpty ? '' : _encodeSkipped(skipped);
+      for (final r in list) {
+        await d.update(
+          'records',
+          {'opSkipped': value},
+          where: 'id = ?',
+          whereArgs: [r.id],
+        );
+        changed++;
+      }
+    }
+    return changed;
+  }
+
+  String _encodeSkipped(Set<String> ids) => jsonEncode(ids.toList());
+
   Future<PotStats> potStats(String batchId) async {
     final list = await pots(batchId);
     final st = PotStats(total: list.length);
@@ -671,6 +821,25 @@ class Repo {
       }
     }
     await softDelete('records', id);
+  }
+
+  /// 删除整次操作：同一个 opId 下的所有批次记录一起软删，图片一并清掉。
+  /// opId 为空（老数据、拍照记录）时只删这一条，返回删除条数。
+  Future<int> deleteOp(String opId) async {
+    if (opId.isEmpty) return 0;
+    final d = await _d;
+    final rows = await d.query(
+      'records',
+      columns: ['id'],
+      where: 'opId = ? AND deletedAt IS NULL',
+      whereArgs: [opId],
+    );
+    var n = 0;
+    for (final m in rows) {
+      await deleteRecord(m['id']! as String);
+      n++;
+    }
+    return n;
   }
 
   // ---------------- 记录 ----------------
@@ -865,6 +1034,63 @@ class Repo {
     r.active = true;
     await saveReminder(r);
     return next;
+  }
+
+  // ---------------- 提醒历史（v2.0.3） ----------------
+
+  /// 写一条历史：一次「完成」动作只写一条，批次是快照
+  Future<void> logReminderDone({
+    required List<Reminder> items,
+    required DateTime done,
+    String? nextDueAt,
+  }) async {
+    if (items.isEmpty) return;
+    final d = await _d;
+    final names = await batchNames();
+    final seen = <String>{};
+    final batches = <Map<String, String>>[];
+    for (final r in items) {
+      if (seen.add(r.batchId)) {
+        batches.add({
+          'id': r.batchId,
+          'name': names[r.batchId] ?? '未命名批次',
+        });
+      }
+    }
+    final head = items.first;
+    await d.insert('reminder_logs', {
+      'id': newId('rlog'),
+      'groupId': head.groupId,
+      'kind': normKind(head.kind),
+      'title': head.title,
+      'notes': head.notes,
+      'doneAt': fmtDay(dateOnly(done)),
+      'nextDueAt': nextDueAt ?? '',
+      'batches': jsonEncode(batches),
+      'createdAt': nowStamp(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<ReminderLog>> reminderLogs({int limit = 50, int offset = 0}) async {
+    final d = await _d;
+    final rows = await d.query(
+      'reminder_logs',
+      orderBy: 'doneAt DESC, createdAt DESC',
+      limit: limit,
+      offset: offset,
+    );
+    return rows.map(ReminderLog.fromMap).toList();
+  }
+
+  Future<int> reminderLogCount() async {
+    final d = await _d;
+    final rows = await d.rawQuery('SELECT COUNT(*) AS c FROM reminder_logs');
+    return (rows.first['c'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> deleteReminderLog(String id) async {
+    final d = await _d;
+    await d.delete('reminder_logs', where: 'id = ?', whereArgs: [id]);
   }
 
   // ---------------- 阶段推算 ----------------

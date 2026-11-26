@@ -5,6 +5,7 @@ import '../core/util.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
 import 'common.dart';
+import 'image_tile.dart';
 import 'crop_manage.dart';
 import 'today.dart';
 
@@ -122,7 +123,7 @@ class _StageListPageState extends State<StageListPage> {
                           Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: ChoiceChip(
-                              label: Text('${c.emoji} ${c.name}'),
+                              label: cropLabel(c, size: 15),
                               selected: c.id == cropId,
                               onSelected: (_) {
                                 setState(() {
@@ -183,14 +184,29 @@ class _StageListPageState extends State<StageListPage> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          '${crop?.emoji ?? ''} ${crop?.name ?? ''}'
-                          '${(crop?.seasonCount ?? 1) > 1 ? ' · ${crop!.seasons[season].name}' : ''}'
-                          ' · ${stages.length} 个阶段',
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        child: Row(
+                          children: [
+                            if (crop != null)
+                              CropIcon(
+                                iconRef: crop!.iconImage,
+                                emoji: crop!.emoji,
+                                size: 17,
+                                fontSize: 14,
+                              ),
+                            if (crop != null) const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                '${crop?.name ?? ''}'
+                                '${(crop?.seasonCount ?? 1) > 1 ? ' · ${crop!.seasons[season].name}' : ''}'
+                                ' · ${stages.length} 个阶段',
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       TextButton.icon(

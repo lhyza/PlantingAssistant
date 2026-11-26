@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../core/images.dart';
 import '../core/theme.dart';
+import '../core/ui_prefs.dart';
 import '../core/util.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
@@ -16,18 +17,24 @@ import 'image_tile.dart';
 
 /// 底部快速记一笔：先选类型，再勾一批批次（可多选，按作物分组）
 Future<void> quickRecord(BuildContext context) async {
-  final batches = await Repo.instance.batches();
+  final all = await Repo.instance.batches();
+  final dead = await Repo.instance.deadBatchIds();
+  // 整盆死光的批次不再出现在「记一笔」里（批次详情里仍可补记）
+  final batches = all.where((b) => !dead.contains(b.id)).toList();
   final crops = await Repo.instance.crops();
   if (!context.mounted) return;
   if (batches.isEmpty) {
+    final nothing = all.isEmpty;
     final go = await confirm(
       context,
-      '还没有批次',
-      body: '先建一个批次，再记这一笔。',
-      ok: '去新建',
+      nothing ? '还没有批次' : '没有可记录的批次',
+      body: nothing
+          ? '先建一个批次，再记这一笔。'
+          : '这些批次的盆都标记成死亡了。先在批次详情里把某一盆改回存活，或者新建一个批次。',
+      ok: nothing ? '去新建' : '知道了',
       danger: false,
     );
-    if (go && context.mounted) {
+    if (go && context.mounted && nothing) {
       await Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const BatchEditPage()),
@@ -169,8 +176,9 @@ Future<void> quickRecord(BuildContext context) async {
                           padding: const EdgeInsets.only(top: 8, bottom: 2),
                           child: Row(
                             children: [
-                              Text(
-                                '${c.emoji} ${c.name}',
+                              cropLabel(
+                                c,
+                                size: 15,
                                 style: const TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w700,
@@ -474,18 +482,9 @@ class _RecordEditPageState extends State<RecordEditPage> {
     final targets = batchList.isEmpty
         ? widget.batchIds
         : batchList.map((b) => b.id).toList();
-    // 一次记录多个批次 → 同一个 opId；同作物里没勾的批次记为「未施」
+    // 多个批次 → 同一个 opId；未施快照对单批次也写（v1.9 起）
     final opId = targets.length > 1 ? newId('op') : '';
-    final skipped = <String>[];
-    if (opId.isNotEmpty) {
-      final cropsInvolved = batchList.map((b) => b.crop).toSet();
-      for (final c in cropsInvolved) {
-        final all = await repo.batches(cropId: c);
-        for (final b in all) {
-          if (!targets.contains(b.id)) skipped.add(b.id);
-        }
-      }
-    }
+    final skipped = await _skippedFor(targets);
     GardenRecord? last;
     for (final id in targets) {
       final r = GardenRecord(id: newId('rec'), batchId: id);
@@ -501,7 +500,20 @@ class _RecordEditPageState extends State<RecordEditPage> {
     Navigator.pop(context, last);
   }
 
-  /// 未施批次只可能来自「同作物的其它批次」，这里做一次去重即可
+  /// 这次没处理到的批次（用于「未施」）。
+  ///
+  /// 只有 施肥/施药/浇水 才算；候选范围由「显示设置 → 未施范围」决定，
+  /// 并排除本次操作的目标批次和整盆死光的批次。
+  Future<List<String>> _skippedFor(List<String> targets) {
+    return repo.skippedForRecord(
+      type: type,
+      targets: targets.toSet(),
+      crops: batchList.map((b) => b.crop).toSet(),
+      acrossCrops: skipAcrossCrops,
+    );
+  }
+
+  /// 未施批次去重（同一批次可能出现在多个作物的查询里）
   List<String> sketchSkipped(List<String> ids) => [...ids.toSet()];
 
   void _fill(GardenRecord r, String title, List<RecordProduct> items) {

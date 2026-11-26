@@ -160,9 +160,10 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      crop?.emoji ?? '🌱',
-                      style: const TextStyle(fontSize: 16),
+                    CropIcon(
+                      iconRef: crop?.iconImage ?? '',
+                      emoji: crop?.emoji ?? '🌱',
+                      size: 18,
                     ),
                     const SizedBox(width: 6),
                     Text(

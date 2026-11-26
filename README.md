@@ -5,7 +5,7 @@
 - 应用名：**种植助手**
 - 包名：`cn.zhongzhizhushou.planting`
 - 技术栈：Flutter 3.50 / Dart 3.14 + SQLite（sqflite）+ 本地通知
-- 当前版本：**1.8.2**（versionCode 11，数据库 v10，导出文件 schemaVersion 5）
+- 当前版本：**2.0.6**（versionCode 23，数据库 v12，导出文件 schemaVersion 6）
 
 ---
 
@@ -41,7 +41,7 @@ app/
 │  ├─ data/               模型、SQLite、仓库层、通知、导入导出、AI 提示词与数据包解析、应用内更新
 │  └─ ui/                 全部页面
 ├─ assets/seeds/          内置知识库（4 作物 28 阶段 60 提醒模板 / 20 品种 / 8 病虫害 / 4 土肥）
-├─ test/                  46 个测试（数据层 + 记录翻页 + UI 冒烟 + 截图）
+├─ test/                  55 个测试（数据层 + 记录翻页 + 显示设置 + 未施算法 + UI 冒烟 + 截图）
 └─ android/               Android 工程（Gradle、Manifest、图标、更新桥）
 docs/
 ├─ App设计文档.md          架构、数据模型、业务规则、页面、导入导出（建议先读这篇）
@@ -61,7 +61,7 @@ flutter pub get
 flutter run                     # 接上手机或模拟器
 
 # 3. 测试与打包
-flutter test                    # 46 个用例
+flutter test                    # 55 个用例
 flutter analyze                 # 0 error
 flutter build apk --release     # 产物：build/app/outputs/flutter-apk/app-release.apk
 ```
@@ -75,7 +75,7 @@ flutter build apk --release     # 产物：build/app/outputs/flutter-apk/app-rel
 - 内置知识库只是文本资料，不含任何账号、接口或第三方服务信息。
 - 唯一的联网行为是「检查更新」：请求 GitHub 的 release 接口下载 APK，不收集也不上传任何数据。其余功能全部离线。
 
-> 数据文件的格式标识：这份源码快照是 `planting.data`，安装包（含线上导出的文件）是 `caomeiyuan.data`，两边**不能直接互导**；要互换只改 `lib/data/transfer.dart` 的 `kFormat` 与 `assets/seeds/*.json` 的 `format` 字段即可。
+> 数据文件的格式标识：这份源码快照统一为 `planting.data`；正式安装包用的是它自己的格式标识（两者不同），两边**不能直接互导**；要互换只改 `lib/data/transfer.dart` 的 `kFormat` 与 `assets/seeds/*.json` 的 `format` 字段即可。
 
 ## 文档索引
 

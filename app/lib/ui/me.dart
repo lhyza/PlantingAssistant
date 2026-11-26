@@ -7,6 +7,7 @@ import '../data/notify.dart';
 import '../data/repo.dart';
 import '../data/update_controller.dart';
 import 'common.dart';
+import 'color_settings.dart';
 import 'crop_manage.dart';
 import 'data_manage.dart';
 import 'stage_manage.dart';
@@ -121,6 +122,13 @@ class _MePageState extends State<MePage> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const DataPage()),
+              );
+              await _load();
+            }),
+            _tile(Icons.tune, '显示设置', '记录里的批次名颜色、未施范围', () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DisplaySettingsPage()),
               );
               await _load();
             }),

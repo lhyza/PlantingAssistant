@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../core/images.dart';
 import '../core/theme.dart';
 import '../core/util.dart';
 import '../data/models.dart';
 import '../data/repo.dart';
+import 'app_state.dart';
 import 'common.dart';
+import 'image_crop.dart';
+import 'image_tile.dart';
 import 'kb_detail.dart';
 
 class CropListPage extends StatefulWidget {
@@ -103,9 +107,12 @@ class _CropListPageState extends State<CropListPage> {
                             color: colorOf(c.color).withValues(alpha: .12),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text(
-                            c.emoji,
-                            style: const TextStyle(fontSize: 20),
+                          child: CropIcon(
+                            iconRef: c.iconImage,
+                            emoji: c.emoji,
+                            size: 26,
+                            fontSize: 20,
+                            radius: 7,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -166,7 +173,7 @@ class CropEditPage extends StatefulWidget {
 }
 
 class _CropEditPageState extends State<CropEditPage> {
-  String image = '';
+  String iconImage = '';
   final _name = TextEditingController();
   final _emoji = TextEditingController(text: '🌱');
   final _cycle = TextEditingController(text: '03-01');
@@ -202,11 +209,20 @@ class _CropEditPageState extends State<CropEditPage> {
         seasons
           ..clear()
           ..addAll(eff.map((e) => _SeasonEdit(e.idx, e.name, e.start)));
-        image = o.image;
+        iconImage = o.iconImage;
         if (o.color.isNotEmpty) color = o.color;
       }
     }
     if (mounted) setState(() => loading = false);
+  }
+
+  /// 选一张图当图标：先裁剪（1:1 裁剪框），再压到 128×128 PNG
+  Future<void> _pickIcon() async {
+    final picked = await pickAndCropPhoto(context);
+    if (picked == null || picked.ref.isEmpty) return;
+    final small = await Images.shrinkTo(picked.ref, size: 128);
+    if (!mounted) return;
+    setState(() => iconImage = small.isEmpty ? picked.ref : small);
   }
 
   Future<void> _save() async {
@@ -234,8 +250,9 @@ class _CropEditPageState extends State<CropEditPage> {
     c.unit = _unit.text.trim().isEmpty ? '盆' : _unit.text.trim();
     c.color = color;
     c.enabled = enabled;
-    c.image = image;
+    c.iconImage = iconImage;
     await Repo.instance.saveCrop(c);
+    bump(); // 让今天页/批次页/提醒页立刻用上新的图标与名字
     if (mounted) Navigator.pop(context);
   }
 
@@ -328,13 +345,6 @@ class _CropEditPageState extends State<CropEditPage> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 40),
               children: [
-                const FormLabel('默认图'),
-                ImageField(
-                  ref: image,
-                  onChanged: (v) => setState(() => image = v),
-                  hint: '这个作物的品种/病虫害没单独设图时，列表和详情就用它',
-                ),
-                const SizedBox(height: 4),
                 Row(
                   children: [
                     Expanded(
@@ -363,6 +373,47 @@ class _CropEditPageState extends State<CropEditPage> {
                         ],
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    CropIcon(
+                      iconRef: iconImage,
+                      emoji: _emoji.text.trim().isEmpty
+                          ? '🌱'
+                          : _emoji.text.trim(),
+                      size: 36,
+                      fontSize: 26,
+                      radius: 9,
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        '自定义图标图片（可选）：设了图就显示图，没设才显示上面的表情',
+                        style: tTiny,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: loading ? null : _pickIcon,
+                      child: Text(iconImage.isEmpty ? '选图片' : '换一张'),
+                    ),
+                    if (iconImage.isNotEmpty)
+                      IconButton(
+                        tooltip: '删除图标图',
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: kInk3,
+                        ),
+                        onPressed: loading
+                            ? null
+                            : () async {
+                                final old = iconImage;
+                                setState(() => iconImage = '');
+                                if (old.isNotEmpty) await Images.remove(old);
+                              },
+                      ),
                   ],
                 ),
                 const FormLabel('生命周期'),

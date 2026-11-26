@@ -20,7 +20,6 @@ class VarietyDetailPage extends StatefulWidget {
 
 class _VarietyDetailPageState extends State<VarietyDetailPage> {
   Variety? v;
-  String cropImage = '';
 
   @override
   void initState() {
@@ -30,11 +29,9 @@ class _VarietyDetailPageState extends State<VarietyDetailPage> {
 
   Future<void> _load() async {
     final x = await Repo.instance.varietyById(widget.varietyId);
-    final ci = x == null ? '' : await defaultImageFor(x.crop);
     if (mounted) {
       setState(() {
         v = x;
-        cropImage = ci;
       });
     }
   }
@@ -68,7 +65,7 @@ class _VarietyDetailPageState extends State<VarietyDetailPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
         children: [
-          HeroImage(ref: x.image, cropRef: cropImage),
+          HeroImage(ref: x.image),
           Row(
             children: [
               if (x.category.isNotEmpty)
@@ -171,7 +168,6 @@ class _VarietyEditPageState extends State<VarietyEditPage> {
   final _yield = TextEditingController();
   Variety? origin;
   String image = '';
-  String cropImage = '';
   int sweetStar = 0, sizeStar = 0, heatStar = 0;
   bool loading = true;
 
@@ -200,11 +196,8 @@ class _VarietyEditPageState extends State<VarietyEditPage> {
         sizeStar = o.sizeStar;
         heatStar = o.heatStar;
         image = o.image;
-        cropImage = await defaultImageFor(o.crop);
       }
     }
-    if (widget.varietyId == null)
-      cropImage = await defaultImageFor(widget.cropId);
     if (mounted) setState(() => loading = false);
   }
 
@@ -265,8 +258,7 @@ class _VarietyEditPageState extends State<VarietyEditPage> {
                 const FormLabel('图片'),
                 ImageField(
                   ref: image,
-                  cropRef: cropImage,
-                  onChanged: (v) => setState(() => image = v),
+                                    onChanged: (v) => setState(() => image = v),
                   hint: '不选的话，列表里用这个作物的默认图',
                 ),
                 const SizedBox(height: 6),
@@ -355,7 +347,6 @@ class PestDetailPage extends StatefulWidget {
 
 class _PestDetailPageState extends State<PestDetailPage> {
   Pest? p;
-  String cropImage = '';
   List<Crop> crops = const [];
 
   @override
@@ -366,12 +357,10 @@ class _PestDetailPageState extends State<PestDetailPage> {
 
   Future<void> _load() async {
     final x = await Repo.instance.pestById(widget.pestId);
-    final ci = x == null ? '' : await defaultImageFor(x.crop);
     final cs = await Repo.instance.crops();
     if (mounted) {
       setState(() {
         p = x;
-        cropImage = ci;
         crops = cs;
       });
     }
@@ -405,7 +394,7 @@ class _PestDetailPageState extends State<PestDetailPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
         children: [
-          HeroImage(ref: x.image, cropRef: cropImage),
+          HeroImage(ref: x.image),
           Row(
             children: [
               if (x.category.isNotEmpty)
@@ -476,7 +465,6 @@ class _PestEditPageState extends State<PestEditPage> {
   final _prevention = TextEditingController();
   Pest? origin;
   String image = '';
-  String cropImage = '';
   bool loading = true;
   List<Crop> crops = const [];
   Set<String> cropSel = {};
@@ -500,7 +488,6 @@ class _PestEditPageState extends State<PestEditPage> {
         _treatment.text = o.treatment;
         _prevention.text = o.prevention;
         image = o.image;
-        cropImage = await defaultImageFor(o.crop);
         common = o.crop == '通用' || o.crops.isEmpty;
         if (!common) cropSel = {...o.crops};
         if (common) cropSel = {};
@@ -508,7 +495,6 @@ class _PestEditPageState extends State<PestEditPage> {
     }
     crops = await Repo.instance.crops();
     if (widget.pestId == null) {
-      cropImage = await defaultImageFor(widget.cropId);
       // 默认绑定当前顶部选中的作物
       final cur = crops.where((c) => c.id == widget.cropId).firstOrNull;
       if (cur != null) {
@@ -562,8 +548,7 @@ class _PestEditPageState extends State<PestEditPage> {
           const FormLabel('图片'),
           ImageField(
             ref: image,
-            cropRef: cropImage,
-            onChanged: (v) => setState(() => image = v),
+                        onChanged: (v) => setState(() => image = v),
             hint: '不选的话，列表里用默认图',
           ),
           const SizedBox(height: 6),
@@ -613,8 +598,9 @@ class _PestEditPageState extends State<PestEditPage> {
                         color: on ? col.withValues(alpha: .45) : kLine,
                       ),
                     ),
-                    child: Text(
-                      '${c.emoji} ${c.name}',
+                    child: cropLabel(
+                      c,
+                      size: 15,
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: on ? FontWeight.w700 : FontWeight.w500,
@@ -655,7 +641,6 @@ class SoilDetailPage extends StatefulWidget {
 
 class _SoilDetailPageState extends State<SoilDetailPage> {
   Soil? s;
-  String cropImage = '';
 
   @override
   void initState() {
@@ -665,11 +650,9 @@ class _SoilDetailPageState extends State<SoilDetailPage> {
 
   Future<void> _load() async {
     final x = await Repo.instance.soilById(widget.soilId);
-    final ci = x == null ? '' : await defaultImageFor(x.crop);
     if (mounted) {
       setState(() {
         s = x;
-        cropImage = ci;
       });
     }
   }
@@ -702,7 +685,7 @@ class _SoilDetailPageState extends State<SoilDetailPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
         children: [
-          HeroImage(ref: x.image, cropRef: cropImage),
+          HeroImage(ref: x.image),
           Row(
             children: [
               if (x.category.isNotEmpty)
@@ -763,7 +746,6 @@ class _SoilEditPageState extends State<SoilEditPage> {
   final _tips = TextEditingController();
   Soil? origin;
   String image = '';
-  String cropImage = '';
   bool loading = true;
 
   @override
@@ -784,10 +766,8 @@ class _SoilEditPageState extends State<SoilEditPage> {
         _method.text = o.method;
         _tips.text = o.tips;
         image = o.image;
-        cropImage = await defaultImageFor(o.crop);
       }
     }
-    if (widget.soilId == null) cropImage = await defaultImageFor(widget.cropId);
     if (mounted) setState(() => loading = false);
   }
 
@@ -831,8 +811,7 @@ class _SoilEditPageState extends State<SoilEditPage> {
           const FormLabel('图片'),
           ImageField(
             ref: image,
-            cropRef: cropImage,
-            onChanged: (v) => setState(() => image = v),
+                        onChanged: (v) => setState(() => image = v),
             hint: '不选的话，列表里用默认图',
           ),
           const SizedBox(height: 6),
@@ -865,18 +844,11 @@ class _SoilEditPageState extends State<SoilEditPage> {
 // ---------------------------------------------------------------- 图片
 
 /// 取某个作物的默认图（病虫害/土肥的「通用」条目用默认作物的图）
-Future<String> defaultImageFor(String crop) async {
-  final c = crop == '通用'
-      ? await Repo.instance.defaultCrop()
-      : await Repo.instance.cropById(crop);
-  return c?.image ?? '';
-}
 
 /// 详情页顶部的图，没有图就用该作物的默认图，再没有就灰底占位
 class HeroImage extends StatelessWidget {
-  const HeroImage({super.key, required this.ref, this.cropRef = ''});
+  const HeroImage({super.key, required this.ref});
   final String ref;
-  final String cropRef;
 
   @override
   Widget build(BuildContext context) {
@@ -886,7 +858,6 @@ class HeroImage extends StatelessWidget {
         aspectRatio: 16 / 9,
         child: LocalImage(
           ref: ref,
-          fallbackRef: cropRef,
           radius: 16,
           iconSize: 34,
         ),
@@ -900,12 +871,10 @@ class ImageField extends StatelessWidget {
   const ImageField({
     super.key,
     required this.ref,
-    this.cropRef = '',
     required this.onChanged,
     this.hint = '',
   });
   final String ref;
-  final String cropRef;
   final ValueChanged<String> onChanged;
   final String hint;
 
@@ -916,7 +885,6 @@ class ImageField extends StatelessWidget {
       children: [
         LocalImage(
           ref: ref,
-          fallbackRef: cropRef,
           width: 88,
           height: 88,
           radius: 14,
@@ -931,7 +899,11 @@ class ImageField extends StatelessWidget {
                 children: [
                   OutlinedButton.icon(
                     onPressed: () async {
-                      final saved = await pickAndCropImage(context);
+                      // 知识库图片最终显示在 16:9 的封面位，进裁剪页就预选 16:9
+                      final saved = await pickAndCropImage(
+                        context,
+                        aspect: 16 / 9,
+                      );
                       if (saved.isNotEmpty) onChanged(saved);
                     },
                     icon: const Icon(Icons.photo_library_outlined, size: 17),
@@ -1024,7 +996,7 @@ class _MaterialDetailPageState extends State<MaterialDetailPage> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
               children: [
-                HeroImage(ref: x.image, cropRef: ''),
+                HeroImage(ref: x.image),
                 Text(
                   x.name,
                   style: const TextStyle(
@@ -1299,8 +1271,9 @@ class _MaterialEditPageState extends State<MaterialEditPage> {
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(color: on ? kRed : kLine),
                           ),
-                          child: Text(
-                            '${c.emoji} ${c.name}',
+                          child: cropLabel(
+                            c,
+                            size: 15,
                             style: TextStyle(
                               fontSize: 12.5,
                               color: on ? kRedDeep : kInk2,

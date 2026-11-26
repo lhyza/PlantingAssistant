@@ -8,6 +8,7 @@ import 'app_state.dart';
 import 'batch_detail.dart';
 import 'batch_edit.dart';
 import 'common.dart';
+import 'image_tile.dart';
 import 'today.dart' show kindFg;
 
 class BatchListPage extends StatefulWidget {
@@ -136,12 +137,13 @@ class _BatchListPageState extends State<BatchListPage> {
                     }),
                     ...crops.map(
                       (c) => _chip(
-                        '${c.emoji} ${c.name}',
+                        c.name,
                         c.id,
                         cropId == c.id,
                         () {
                           setState(() => cropId = c.id);
                         },
+                        crop: c,
                       ),
                     ),
                   ],
@@ -156,6 +158,11 @@ class _BatchListPageState extends State<BatchListPage> {
             for (final entry in groups.entries) ...[
               SectionTitle(
                 _cropName(entry.key),
+                leading: CropIcon(
+                  iconRef: _cropImage(entry.key),
+                  emoji: _cropEmoji(entry.key),
+                  size: 16,
+                ),
                 count: entry.value.length,
                 trailing: Text(
                   '${entry.value.fold<int>(0, (a, b) => a + b.potCount)} ${_unit(entry.key)}',
@@ -170,7 +177,18 @@ class _BatchListPageState extends State<BatchListPage> {
     );
   }
 
-  Widget _chip(String label, String id, bool on, VoidCallback tap) {
+  Widget _chip(
+    String label,
+    String id,
+    bool on,
+    VoidCallback tap, {
+    Crop? crop,
+  }) {
+    final style = TextStyle(
+      fontSize: 13,
+      fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+      color: on ? kRedDeep : kInk2,
+    );
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
@@ -182,22 +200,31 @@ class _BatchListPageState extends State<BatchListPage> {
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: on ? kRed : kLine, width: on ? 1.4 : 1),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: on ? FontWeight.w700 : FontWeight.w500,
-              color: on ? kRedDeep : kInk2,
-            ),
-          ),
+          child: crop == null
+              ? Text(label, style: style)
+              : cropLabel(crop, size: 15, style: style),
         ),
       ),
     );
   }
 
+  String _cropImage(String id) {
+    for (final c in crops) {
+      if (c.id == id) return c.iconImage;
+    }
+    return '';
+  }
+
+  String _cropEmoji(String id) {
+    for (final c in crops) {
+      if (c.id == id) return c.emoji;
+    }
+    return '🌿';
+  }
+
   String _cropName(String id) {
     for (final c in crops) {
-      if (c.id == id) return '${c.emoji} ${c.name}';
+      if (c.id == id) return c.name;
     }
     return '未分类';
   }

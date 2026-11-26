@@ -7,6 +7,8 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' hide Batch;
 
 import 'package:planting/app.dart';
+import 'package:planting/core/theme.dart';
+import 'package:planting/core/ui_prefs.dart';
 import 'package:planting/core/util.dart';
 import 'package:planting/data/models.dart';
 import 'package:planting/data/repo.dart';
@@ -83,6 +85,7 @@ void main() {
       ],
       opId: 'top1',
       opSkipped: const ['tb2'],
+      notes: '重点喷叶背',
     ));
     // 第二次操作：单独给露台大盆施肥
     await repo.saveRecord(GardenRecord(
@@ -96,6 +99,21 @@ void main() {
       ],
       opId: 'top2',
     ));
+
+    // 一条提醒涉及两个批次（同 groupId）→ 今天页只应出现一张卡，且列出两个批次名
+    for (final b in ['tb1', 'tb2']) {
+      await repo.saveReminder(Reminder(
+        id: 'trm_$b',
+        batchId: b,
+        kind: '施肥',
+        title: '促花肥（提醒）',
+        intervalDays: 7,
+        nextDueAt: d(0),
+        active: true,
+        groupId: 'trg1',
+        notes: '花前用一次',
+      ));
+    }
   });
 
   tearDownAll(() async {
@@ -142,4 +160,156 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('操作记录：产品 → 备注 → 施用 → 未施，各按配置着色', (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const PlantingApp());
+    await _flush(tester, 12);
+
+    // 四种文本都在同一条记录里
+    final product = find.textContaining('苯醚甲环唑');
+    final notes = find.text('重点喷叶背');
+    final applied = find.text('施用：阳台花架');
+    final skipped = find.text('未施：露台大盆');
+    expect(product, findsWidgets);
+    expect(notes, findsOneWidget);
+    expect(applied, findsOneWidget);
+    expect(skipped, findsOneWidget);
+
+    // 顺序：产品 → 备注 → 施用 → 未施
+    final yProduct = tester.getTopLeft(product.first).dy;
+    final yNotes = tester.getTopLeft(notes).dy;
+    final yApplied = tester.getTopLeft(applied).dy;
+    final ySkipped = tester.getTopLeft(skipped).dy;
+    expect(yProduct, lessThan(yNotes));
+    expect(yNotes, lessThan(yApplied));
+    expect(yApplied, lessThan(ySkipped));
+
+    // 默认配色：施用深橙、未施橙，两者不同
+    final appliedText = tester.widget<Text>(applied);
+    final skippedText = tester.widget<Text>(skipped);
+    expect(appliedText.style?.color, kDefaultAppliedColor);
+    expect(skippedText.style?.color, kDefaultSkippedColor);
+    expect(kDefaultAppliedColor.toARGB32(), isNot(kDefaultSkippedColor.toARGB32()));
+
+    // 详情页把它叫「本次忽略」
+    await tester.tap(find.byType(OpRecordTile).first);
+    await _flush(tester, 6);
+    expect(find.text('本次忽略'), findsOneWidget);
+    expect(find.textContaining('露台大盆'), findsWidgets);
+
+  });
+
+  testWidgets('我的 → 显示设置：颜色与未施范围', (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const PlantingApp());
+    await _flush(tester, 12);
+
+    await tester.tap(find.text('我的').last);
+    await _flush(tester, 10);
+    expect(find.text('显示设置'), findsOneWidget);
+
+    await tester.tap(find.text('显示设置'));
+    await _flush(tester, 8);
+    expect(find.text('施用批次名称'), findsOneWidget);
+    expect(find.text('未施批次名称'), findsOneWidget);
+    // 两个默认色不同，且页面显示了当前色值
+    expect(find.textContaining('#C2410C'), findsOneWidget);
+    expect(find.textContaining('#E0862B'), findsOneWidget);
+    // 新的「记录偏好」段
+    expect(find.text('未施范围'), findsOneWidget);
+    expect(find.text('算上其它作物'), findsOneWidget);
+  });
+
+  testWidgets('记录详情可删除整次操作，且删除前要确认', (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const PlantingApp());
+    await _flush(tester, 12);
+    expect(find.byType(OpRecordTile), findsNWidgets(2));
+
+    await tester.tap(find.byType(OpRecordTile).first);
+    await _flush(tester, 6);
+    expect(find.text('第 1/2 次操作'), findsOneWidget);
+
+    // 点删除 → 先弹确认框，正文要写清涉及哪个批次、共几条
+    await tester.tap(find.byTooltip('删除这次操作'));
+    await _flush(tester, 4);
+    expect(find.text('删除这次操作？'), findsOneWidget);
+    expect(find.textContaining('阳台花架'), findsWidgets);
+    expect(find.textContaining('共 1 条记录'), findsOneWidget);
+
+    // 取消：什么都不删，仍停在详情页
+    await tester.tap(find.text('取消'));
+    await _flush(tester, 10);
+    expect(find.text('删除这次操作？'), findsNothing);
+    expect(find.text('第 1/2 次操作'), findsOneWidget);
+
+    // 确认删除：整次操作（同 opId 的多条）一起消失，另一组保留
+    await tester.tap(find.byTooltip('删除这次操作'));
+    await _flush(tester, 6);
+    await tester.tap(find.text('删除'));
+    await _flush(tester, 8);
+
+    expect(find.text('删除这次操作？'), findsNothing);
+    final left = (await tester.runAsync(() => Repo.instance.records()))!;
+    expect(left.any((e) => e.opId == 'top1'), isFalse);
+    expect(left.any((e) => e.opId == 'top2'), isTrue);
+
+    // bump() 会触发其它页（批次列表等）重新查库，等它们跑完再结束用例
+    await _flush(tester, 25);
+  });
+
+  testWidgets('今天页「全部」也用单批次阶段条，chips 可切换', (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const PlantingApp());
+    await _flush(tester, 12);
+
+    // chips 首位是「全部」
+    expect(find.text('全部'), findsOneWidget);
+
+    await tester.tap(find.text('全部'));
+    await _flush(tester, 10);
+
+    // v1.9.1：全部模式与单品种同款——一次显示一个批次的阶段条
+    expect(find.text('全部作物'), findsNothing);
+    expect(find.text('阳台花架'), findsWidgets);
+    expect(find.textContaining('第 '), findsWidgets);
+    // 两个批次都出现在 chips 里，可以一个个点
+    expect(find.textContaining('露台大盆'), findsWidgets);
+
+    await tester.tap(find.textContaining('露台大盆').last);
+    await _flush(tester, 6);
+    expect(find.text('阳台花架'), findsWidgets);
+  });
+
+  testWidgets('多批次提醒在今天页只有一张卡，并列出涉及的批次', (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const RepaintBoundary(child: PlantingApp()),
+    );
+    await _flush(tester, 14);
+
+    // 两个批次只渲染一张卡：标题只出现一次
+    expect(find.text('促花肥（提醒）'), findsOneWidget);
+    // 第二行：类型 · 每 N 天 · 备注
+    expect(find.textContaining('施肥 · 每 7 天 · 花前用一次'), findsOneWidget);
+    // 第三行：批次：全部涉及批次
+    expect(find.text('批次：阳台花架、露台大盆'), findsOneWidget);
+  });
+
 }

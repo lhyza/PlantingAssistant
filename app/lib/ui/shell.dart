@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 
 import '../core/theme.dart';
 import '../data/update_controller.dart';
+import 'app_state.dart';
 import 'batch_list.dart';
 import 'knowledge.dart';
 import 'common.dart';
 import 'me.dart';
 import 'record_edit.dart';
+import 'reminder_panel.dart';
 import 'today.dart';
 
 class Shell extends StatefulWidget {
@@ -23,13 +25,18 @@ class _ShellState extends State<Shell> {
   void initState() {
     super.initState();
     UpdateController.instance.addListener(_onUpdate);
+    refreshTick.addListener(_onRefresh);
+    refreshReminderBadge();
   }
 
   @override
   void dispose() {
     UpdateController.instance.removeListener(_onUpdate);
+    refreshTick.removeListener(_onRefresh);
     super.dispose();
   }
+
+  void _onRefresh() => refreshReminderBadge();
 
   void _onUpdate() {
     if (mounted) setState(() {});
@@ -59,6 +66,7 @@ class _ShellState extends State<Shell> {
         children: const [
           TodayPage(),
           BatchListPage(),
+          ReminderPanelPage(),
           KnowledgePage(),
           MePage(),
         ],
@@ -87,23 +95,42 @@ class _ShellState extends State<Shell> {
         indicatorColor: kRedBg,
         height: 64,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.wb_sunny_outlined),
             selectedIcon: Icon(Icons.wb_sunny, color: kRed),
             label: '今天',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.yard_outlined),
             selectedIcon: Icon(Icons.yard, color: kRed),
             label: '批次',
           ),
           NavigationDestination(
+            icon: ValueListenableBuilder<int>(
+              valueListenable: reminderBadge,
+              builder: (context, n, child) {
+                final icon = Icon(
+                  Icons.notifications_none,
+                  color: _index == 2 ? kRed : null,
+                );
+                if (n <= 0) return icon;
+                return Badge.count(
+                  count: n,
+                  backgroundColor: kRed,
+                  textColor: Colors.white,
+                  child: icon,
+                );
+              },
+            ),
+            label: '提醒',
+          ),
+          const NavigationDestination(
             icon: Icon(Icons.menu_book_outlined),
             selectedIcon: Icon(Icons.menu_book, color: kRed),
             label: '知识',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person, color: kRed),
             label: '我的',

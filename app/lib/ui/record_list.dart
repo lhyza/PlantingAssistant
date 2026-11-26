@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../core/util.dart';
 import '../data/models.dart';
+import '../core/ui_prefs.dart';
 import '../data/repo.dart';
+import 'app_state.dart';
 import 'common.dart';
 import 'image_tile.dart';
 
@@ -40,7 +42,25 @@ class _RecordListPageState extends State<RecordListPage> {
   @override
   void initState() {
     super.initState();
+    refreshTick.addListener(_onTick);
     _init();
+  }
+
+  @override
+  void dispose() {
+    refreshTick.removeListener(_onTick);
+    super.dispose();
+  }
+
+  void _onTick() => _reload();
+
+  Future<void> _reload() async {
+    items.clear();
+    groups.clear();
+    _seenOps.clear();
+    more = true;
+    if (mounted) setState(() {});
+    await _init();
   }
 
   Future<void> _init() async {
@@ -274,7 +294,7 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
         : siblings.map((e) => e.batchId).toList();
     final skipped = r.opSkipped;
     if (applied.isEmpty && skipped.isEmpty) return const SizedBox.shrink();
-    final single = applied.length == 1 && skipped.isEmpty;
+    final singleApplied = applied.length == 1;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
@@ -283,56 +303,40 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (single)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (singleApplied)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Text('所属批次', style: tSub),
+                  )
+                else
+                  Pill('施用 ${applied.length}', bg: kGreenBg, fg: kGreen),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    applied.map(_name).join('、'),
+                    style: tBody.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            if (skipped.isNotEmpty) ...[
+              const SizedBox(height: 8),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('所属批次', style: tSub),
+                  const Pill('本次忽略', bg: kAmberBg, fg: kAmber),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _name(applied.first),
-                      style: tBody.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              )
-            else ...[
-              Row(
-                children: [
-                  Pill(
-                    '施用 ${applied.length}',
-                    bg: kGreenBg,
-                    fg: kGreen,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      applied.map(_name).join('、'),
-                      style: tBody,
+                      skipped.map(_name).join('、'),
+                      style: tBody.copyWith(color: kAmber),
                     ),
                   ),
                 ],
               ),
-              if (skipped.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Pill(
-                      '未施 ${skipped.length}',
-                      bg: kAmberBg,
-                      fg: kAmber,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        skipped.map(_name).join('、'),
-                        style: tBody.copyWith(color: kAmber),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ],
         ),
@@ -345,6 +349,40 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
     _load();
   }
 
+  Future<void> _delete() async {
+    final head = _head;
+    final recs = _cur;
+    final batchNamesOf = <String>[];
+    for (final r in recs) {
+      final n = names[r.batchId] ?? '';
+      if (n.isNotEmpty && !batchNamesOf.contains(n)) batchNamesOf.add(n);
+    }
+    final body = [
+      '${head.date} · ${head.type}',
+      if (batchNamesOf.isNotEmpty) batchNamesOf.join('、'),
+      '共 ${recs.length} 条记录，删除后今天页和记录列表都不再显示，图片也会一起清掉。',
+    ].join('\n');
+    final ok = await confirm(
+      context,
+      '删除这次操作？',
+      body: body,
+      ok: '删除',
+      danger: true,
+    );
+    if (!ok || !mounted) return;
+    final int n;
+    if (head.opId.isEmpty) {
+      await Repo.instance.deleteRecord(head.id);
+      n = 1;
+    } else {
+      n = await Repo.instance.deleteOp(head.opId);
+    }
+    if (!mounted) return;
+    bump();
+    toast(context, '已删除这次操作，共 $n 条记录');
+    Navigator.pop(context, true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final r = _head;
@@ -355,7 +393,7 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
         title: Text(widget.photo ? '拍照记录' : '操作记录'),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: 4),
             child: Center(
               child: Text(
                 _groups == null ? '${i + 1}/$_total' : '第 ${i + 1}/$_total 次操作',
@@ -363,6 +401,12 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
               ),
             ),
           ),
+          IconButton(
+            tooltip: '删除这次操作',
+            icon: const Icon(Icons.delete_outline, color: kRedDeep),
+            onPressed: _delete,
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: ListView(
@@ -582,7 +626,9 @@ class OpRecordTile extends StatelessWidget {
     final multi = records.length > 1 || r.opSkipped.isNotEmpty;
     final applied = records.map((e) => _name(e.batchId)).toList();
     final skipped = r.opSkipped.map(_name).toList();
-    return Container(
+    return ListenableBuilder(
+      listenable: Listenable.merge([appliedNameColor, skippedNameColor]),
+      builder: (context, _) => Container(
       padding: const EdgeInsets.all(12),
       decoration: cardDeco(),
       child: Row(
@@ -645,32 +691,29 @@ class OpRecordTile extends StatelessWidget {
                         .join(' · '),
                     style: tSub,
                   ),
-                if (applied.isNotEmpty)
-                  Text(
-                    '${multi ? '施用：' : ''}${applied.join('、')}',
-                    style: tSub,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                if (skipped.isNotEmpty)
-                  Text(
-                    '未施：${skipped.join('、')}',
-                    style: tSub.copyWith(color: kAmber),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
                 if (r.notes.isNotEmpty)
                   Text(
                     r.notes,
                     style: tSub,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                if (applied.isNotEmpty)
+                  Text(
+                    '${multi ? '施用：' : ''}${applied.join('、')}',
+                    style: tSub.copyWith(color: appliedNameColor.value),
+                  ),
+                if (skipped.isNotEmpty)
+                  Text(
+                    '未施：${skipped.join('、')}',
+                    style: tSub.copyWith(color: skippedNameColor.value),
                   ),
               ],
             ),
           ),
           const Icon(Icons.chevron_right, size: 16, color: kInk3),
         ],
+      ),
       ),
     );
   }

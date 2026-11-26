@@ -7,6 +7,7 @@ import '../data/notify.dart';
 import '../data/repo.dart';
 import 'app_state.dart';
 import 'common.dart';
+import 'image_tile.dart';
 import 'record_edit.dart' show kindEmojiOf;
 
 /// 完成一次提醒：选择完成日期 → 滚动到下次到期
@@ -75,6 +76,11 @@ Future<void> finishReminder(BuildContext context, Reminder r) async {
   );
   if (ok != true) return;
   await Repo.instance.completeReminder(r, doneAt: done);
+  await Repo.instance.logReminderDone(
+    items: [r],
+    done: done,
+    nextDueAt: r.isOneTime ? '' : r.nextDueAt,
+  );
   await Notify.instance.reschedule();
   bump();
   if (context.mounted) {
@@ -171,11 +177,11 @@ class _ReminderEditPageState extends State<ReminderEditPage> {
     return '未分类';
   }
 
-  String _cropEmoji(String id) {
+  Crop? _cropOf(String id) {
     for (final c in crops) {
-      if (c.id == id) return c.emoji;
+      if (c.id == id) return c;
     }
-    return '🌿';
+    return null;
   }
 
   Future<void> _save() async {
@@ -238,7 +244,7 @@ class _ReminderEditPageState extends State<ReminderEditPage> {
     await Notify.instance.reschedule();
     bump();
     if (!mounted) return;
-    Navigator.pop(context);
+    Navigator.pop(context, true);
     await toast(
       context,
       isNew && selected.length > 1
@@ -440,14 +446,25 @@ class _ReminderEditPageState extends State<ReminderEditPage> {
           padding: const EdgeInsets.only(top: 6, bottom: 2),
           child: Row(
             children: [
-              Text(
-                '${_cropEmoji(entry.key)} ${_cropName(entry.key)}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: kInk2,
+              if (_cropOf(entry.key) == null)
+                Text(
+                  '🌿 ${_cropName(entry.key)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: kInk2,
+                  ),
+                )
+              else
+                cropLabel(
+                  _cropOf(entry.key)!,
+                  size: 17,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: kInk2,
+                  ),
                 ),
-              ),
               const SizedBox(width: 6),
               Text('${list.length}', style: tTiny),
               const Spacer(),

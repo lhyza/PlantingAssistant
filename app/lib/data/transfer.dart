@@ -11,7 +11,7 @@ import 'models.dart';
 import 'repo.dart';
 
 const String kFormat = 'planting.data';
-const int kSchema = 5;
+const int kSchema = 6;
 const String kAppVersion = '1.0.0';
 
 const Map<String, String> kKindNames = {
@@ -188,6 +188,9 @@ class Transfer {
           }
         }
         base['pots'] = pots;
+        base['reminderLogs'] = [
+          for (final l in await _repo.reminderLogs(limit: 5000)) l.toMap(),
+        ];
         break;
       case 'variety':
         final list = await _allVarieties();
@@ -246,7 +249,7 @@ class Transfer {
                 'unit': c.unit,
                 'isDefault': c.isDefault ? 1 : 0,
                 'enabled': c.enabled ? 1 : 0,
-                'image': c.image,
+                'iconImage': c.iconImage,
                 'sortOrder': c.sortOrder,
                 'rev': c.rev,
                 'createdAt': c.createdAt,
@@ -269,10 +272,12 @@ class Transfer {
       if (list == null) return;
       for (final raw in list) {
         if (raw is! Map) continue;
-        final ref = raw['image']?.toString() ?? '';
-        if (ref.isEmpty || ref.startsWith('data:')) continue;
-        final uri = await Images.dataUri(ref);
-        if (uri != null) raw['image'] = uri;
+        for (final k in const ['image', 'iconImage']) {
+          final ref = raw[k]?.toString() ?? '';
+          if (ref.isEmpty || ref.startsWith('data:')) continue;
+          final uri = await Images.dataUri(ref);
+          if (uri != null) raw[k] = uri;
+        }
       }
     }
 
@@ -286,10 +291,11 @@ class Transfer {
       if (list == null) return;
       for (final raw in list) {
         if (raw is! Map) continue;
-        final ref = raw['image']?.toString() ?? '';
-        if (!ref.startsWith('data:')) continue;
-        final saved = await Images.saveDataUri(ref);
-        raw['image'] = saved;
+        for (final k in const ['image', 'iconImage']) {
+          final ref = raw[k]?.toString() ?? '';
+          if (!ref.startsWith('data:')) continue;
+          raw[k] = await Images.saveDataUri(ref);
+        }
       }
     }
 
@@ -353,7 +359,9 @@ class Transfer {
         error: '不是有效的 JSON 文件',
       );
     }
-    if (data['format'] != kFormat) {
+    // 兼容两种格式标识：正式安装包用 kFormat，开源快照/samples 用 planting.data
+    final fmt = data['format']?.toString() ?? '';
+    if (fmt != kFormat && fmt != 'planting.data') {
       return ImportPlan(
         fileName: fileName,
         kind: '',
@@ -497,6 +505,10 @@ class Transfer {
       final pots = (data['pots'] as List? ?? const []);
       if (pots.isNotEmpty) {
         diffs.add(ImportDiff('盆状态 ${pots.length} 条', 'add', detail: '随批次合并'));
+      final logs = (data['reminderLogs'] as List? ?? const []);
+      if (logs.isNotEmpty) {
+        diffs.add(ImportDiff('提醒历史 ${logs.length} 条', 'add', detail: '新增，不覆盖已有'));
+      }
       }
       return ImportPlan(
         fileName: plan.fileName,
@@ -623,6 +635,23 @@ class Transfer {
           await txn.insert(
             'reminders',
             _reminderRow(m),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        for (final raw in (data['reminderLogs'] as List? ?? const [])) {
+          final m = Map<String, dynamic>.from(raw as Map);
+          final id = (m['id'] ?? '').toString();
+          if (id.isEmpty) continue;
+          final hit = await txn.query(
+            'reminder_logs',
+            where: 'id = ?',
+            whereArgs: [id],
+            limit: 1,
+          );
+          if (hit.isNotEmpty) continue;
+          await txn.insert(
+            'reminder_logs',
+            _rlogRow(m),
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
         }
@@ -1003,6 +1032,20 @@ class Transfer {
     'createdAt': m['createdAt'] ?? '',
     'updatedAt': m['updatedAt'] ?? '',
     'deletedAt': m['deletedAt'],
+  };
+
+  Map<String, dynamic> _rlogRow(Map<String, dynamic> m) => {
+    'id': m['id'],
+    'groupId': m['groupId'] ?? '',
+    'kind': m['kind'] ?? '其他',
+    'title': m['title'] ?? '',
+    'notes': m['notes'] ?? '',
+    'doneAt': m['doneAt'] ?? '',
+    'nextDueAt': m['nextDueAt'] ?? '',
+    'batches': m['batches'] is String
+        ? m['batches']
+        : jsonEncode(m['batches'] ?? const []),
+    'createdAt': m['createdAt'] ?? nowStamp(),
   };
 
   Map<String, dynamic> _reminderRow(Map<String, dynamic> m) => {

@@ -1,11 +1,15 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Color;
 
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' hide Batch;
+import 'package:planting/core/images.dart';
 import 'package:planting/data/models.dart';
+import 'package:planting/core/ui_prefs.dart';
 import 'package:planting/core/util.dart';
 import 'package:planting/data/ai_prompt.dart';
 import 'package:planting/data/reminder_group.dart';
@@ -354,16 +358,16 @@ void main() {
     expect(after.any((e) => e.id == 'ph_pot2'), isFalse);
   });
 
-  test('导出文件：schemaVersion 5 且带 pots / potIndex / groupId', () async {
+  test('导出文件：schemaVersion 6 且带 pots / potIndex / groupId', () async {
     final b = await makeBatch('导出测试');
     b.potCount = 2;
     await Repo.instance.saveBatch(b);
     final file = await Transfer.instance.buildFile('garden');
-    expect(file['schemaVersion'], 5);
+    expect(file['schemaVersion'], 6);
     expect((file['pots'] as List).length, greaterThanOrEqualTo(2));
     expect((file['batches'] as List).first, contains('photoMode'));
     final pestFile = await Transfer.instance.buildFile('pest');
-    expect(pestFile['schemaVersion'], 5);
+    expect(pestFile['schemaVersion'], 6);
     expect((pestFile['items'] as List).first, contains('crops'));
   });
 
@@ -588,6 +592,95 @@ void main() {
     expect(names[b1.id], '施用A');
   });
 
+  // ---------------- v1.8.4：施用方式半角括号 ----------------
+  test('施用方式统一成半角括号，旧数据启动后自动归一（幂等）', () async {
+    expect(Supply.kMethods, contains('喷雾(叶背)'));
+    expect(Supply.kMethods.any((e) => e.contains('（')), isFalse);
+
+    await Repo.instance.saveMaterial(Supply(
+      id: 'mat_full',
+      kind: 'medicine',
+      name: '旧药',
+      ratio: '1:800',
+      method: '喷雾（叶背）',
+      methods: ['喷雾（叶背）', '灌根'],
+    ));
+    final b = await makeBatch('归一', id: 'b_norm');
+    await Repo.instance.saveRecord(GardenRecord(
+      id: 'rec_norm',
+      batchId: b.id,
+      type: '施药',
+      date: todayStr(),
+      title: '归一测试',
+      products: [
+        RecordProduct(name: '旧药', dosage: '1:800', method: '喷雾（叶背）'),
+      ],
+    ));
+
+    expect(await Repo.instance.normalizeMethodNames(), greaterThanOrEqualTo(2));
+
+    final m2 = (await Repo.instance.materials('medicine'))
+        .firstWhere((e) => e.id == 'mat_full');
+    expect(m2.method, '喷雾(叶背)');
+    expect(m2.methods, contains('喷雾(叶背)'));
+    expect(m2.methods.toString(), isNot(contains('（')));
+
+    final r2 = (await Repo.instance.records())
+        .firstWhere((e) => e.id == 'rec_norm');
+    expect(r2.products.first.method, '喷雾(叶背)');
+
+    // 幂等：再跑一次没有改动
+    expect(await Repo.instance.normalizeMethodNames(), 0);
+  });
+
+  test('颜色配置：十六进制解析与回退默认', () {
+    expect(hexOfColor(const Color(0xFFC2410C)), '#C2410C');
+    expect(hexOfColor(parseHexColor('#c2410c')!), '#C2410C');
+    expect(hexOfColor(parseHexColor('E0862B')!), '#E0862B');
+    expect(parseHexColor('#F08'), isNull);
+    expect(parseHexColor('不是颜色'), isNull);
+    expect(kDefaultAppliedColor.toARGB32(), isNot(kDefaultSkippedColor.toARGB32()));
+  });
+
+  // ---------------- v1.8.3：删除整次操作 ----------------
+  test('删除整次操作：同 opId 的记录一起删，其它记录不受影响', () async {
+    final b1 = await makeBatch('删除A', id: 'b_del_a');
+    final b2 = await makeBatch('删除B', id: 'b_del_b');
+    const op = 'op_del_1';
+    for (final (i, b) in [(1, b1), (2, b2)]) {
+      await Repo.instance.saveRecord(
+        GardenRecord(
+          id: 'del_r$i',
+          batchId: b.id,
+          type: '施药',
+          date: todayStr(),
+          title: '删除测试',
+          opId: op,
+        ),
+      );
+    }
+    await Repo.instance.saveRecord(
+      GardenRecord(
+        id: 'del_keep',
+        batchId: b1.id,
+        type: '浇水',
+        date: todayStr(),
+        title: '保留',
+        opId: 'op_del_2',
+      ),
+    );
+
+    expect((await Repo.instance.recordsByOp(op)).length, 2);
+    expect(await Repo.instance.deleteOp(op), 2);
+    expect(await Repo.instance.recordsByOp(op), isEmpty);
+
+    final all = await Repo.instance.records();
+    expect(all.any((e) => e.id == 'del_keep'), isTrue);
+    expect(all.any((e) => e.id == 'del_r1'), isFalse);
+    // 再删一次不会重复计数
+    expect(await Repo.instance.deleteOp(op), 0);
+  });
+
   // ---------------- v1.7：施用方式多选 ----------------
   test('肥料可存多种施用方式，老记录只有单值时自动兼容', () async {
     final m = Supply(
@@ -633,18 +726,18 @@ void main() {
     expect(got.products.first.effMethods, ['灌根', '喷雾']);
   });
 
-  // ---------------- v1.7：导出 schemaVersion 5 ----------------
-  test('导出文件 schemaVersion 为 5，并带季与 opId', () async {
+  // ---------------- v1.7：导出 schemaVersion 5（v2.0.3 起为 6） ----------------
+  test('导出文件 schemaVersion 为 6，并带季与 opId', () async {
     await makeBatch('导出v5');
     final f = await Transfer.instance.buildFile('garden');
-    expect(f['schemaVersion'], 5);
+    expect(f['schemaVersion'], 6);
     final batches = (f['batches'] as List).cast<Map>();
     expect(batches.any((e) => e.containsKey('season')), isTrue);
     final records = (f['records'] as List).cast<Map>();
     expect(records.any((e) => e.containsKey('opId')), isTrue);
 
     final st = await Transfer.instance.buildFile('stage');
-    expect(st['schemaVersion'], 5);
+    expect(st['schemaVersion'], 6);
     final crops = (st['crops'] as List).cast<Map>();
     expect(crops.any((e) => e['seasons'] is List), isTrue);
   });
@@ -654,4 +747,170 @@ void main() {
       await tmp.delete(recursive: true);
     } catch (_) {}
   });
+
+  test('未施：单批次也有快照，范围可切换，死光批次不进候选', () async {
+    final repo = Repo.instance;
+    final straw =
+        (await repo.crops()).firstWhere((c) => c.id == 'crop_strawberry');
+    final lemon = (await repo.crops()).firstWhere((c) => c.id == 'crop_lemon');
+    final plant = fmtDay(
+      dateOnly(DateTime.now().subtract(const Duration(days: 40))),
+    );
+
+    final a = await makeBatch('未施A', id: 'skip_a');
+    await repo.saveBatch(
+      Batch(
+        id: 'skip_b',
+        crop: straw.id,
+        name: '未施B',
+        variety: '红颜',
+        plantDate: plant,
+        potCount: 2,
+        color: '#2A9D8F',
+      ),
+    );
+    await repo.saveBatch(
+      Batch(
+        id: 'skip_c',
+        crop: lemon.id,
+        name: '柠檬C',
+        variety: '尤力克',
+        plantDate: plant,
+        potCount: 1,
+        color: '#E8B23A',
+      ),
+    );
+
+    // 默认（跨作物）：别的作物也算未施
+    final all = await repo.skippedForRecord(
+      type: '施肥',
+      targets: {a.id},
+      crops: {straw.id},
+      acrossCrops: true,
+    );
+    expect(all.contains('skip_c'), isTrue, reason: '默认跨作物');
+    expect(all.contains(a.id), isFalse, reason: '目标批次不算未施');
+
+    // 仅同作物：柠檬不再出现
+    final same = await repo.skippedForRecord(
+      type: '施肥',
+      targets: {a.id},
+      crops: {straw.id},
+      acrossCrops: false,
+    );
+    expect(same.contains('skip_c'), isFalse);
+    expect(same.contains('skip_b'), isTrue);
+
+    // 拍照 / 其他 没有「未施」
+    expect(
+      await repo.skippedForRecord(type: '拍照', targets: {a.id}),
+      isEmpty,
+    );
+    expect(
+      await repo.skippedForRecord(type: '其他', targets: {a.id}),
+      isEmpty,
+    );
+
+    // 整盆死光 → 不再进候选
+    for (final p in await repo.pots('skip_b')) {
+      await repo.setPotState(p, 'dead');
+    }
+    final after = await repo.skippedForRecord(
+      type: '施肥',
+      targets: {a.id},
+      crops: {straw.id},
+      acrossCrops: false,
+    );
+    expect(after.contains('skip_b'), isFalse, reason: '死光批次不进未施');
+    expect(await repo.deadBatchIds(), contains('skip_b'));
+  });
+
+  test('作物图标：能存库、能压成小图、导出带上 iconImage', () async {
+    final repo = Repo.instance;
+    // 1×1 红点 PNG，够验证解码/缩放链路
+    const png =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    final bytes = base64Decode(png);
+    final small = await Images.saveScaled(bytes, size: 128);
+    expect(small, startsWith('images/'));
+    expect(Images.exists(small), isTrue);
+    final abs = Images.pathOf(small)!;
+    // 输出是 128×128 的方图（用文件头宽高校验：PNG IHDR 第 16..24 字节）
+    final head = await File(abs).readAsBytes();
+    final w = (head[16] << 24) | (head[17] << 16) | (head[18] << 8) | head[19];
+    expect(w, 128);
+
+    final c = (await repo.cropById('crop_strawberry'))!;
+    c.iconImage = small;
+    await repo.saveCrop(c);
+    expect((await repo.cropById('crop_strawberry'))!.iconImage, small);
+
+    final plan = await Transfer.instance.buildFile('stage');
+    final raw = (plan['crops'] as List)
+        .cast<Map>()
+        .firstWhere((e) => e['id'] == 'crop_strawberry');
+    // 有文件 → 导出成 data URI，换手机也能带走
+    expect(raw['iconImage'].toString(), startsWith('data:image/png;base64,'));
+    await Images.remove(small);
+  });
+
+  test('回填：老记录补「未施」快照，且只跑一次', () async {
+    final repo = Repo.instance;
+    final b = await makeBatch('回填A', id: 'bf_a');
+    final plant = fmtDay(
+      dateOnly(DateTime.now().subtract(const Duration(days: 40))),
+    );
+    await repo.saveBatch(
+      Batch(
+        id: 'bf_b',
+        crop: b.crop,
+        name: '回填B',
+        variety: '红颜',
+        plantDate: plant,
+        potCount: 2,
+        color: '#8A63D2',
+      ),
+    );
+    await repo.saveRecord(
+      GardenRecord(
+        id: 'bf_r1',
+        batchId: 'bf_a',
+        type: '施肥',
+        date: todayStr(),
+        title: '回填测试',
+      ),
+    );
+
+    final first = await repo.backfillOpSkipped();
+    expect(first, greaterThan(0));
+    final got = (await repo.records(batchId: 'bf_a'))
+        .firstWhere((r) => r.id == 'bf_r1');
+    expect(got.opSkipped, contains('bf_b'));
+
+    // 幂等：再跑一次没有可补的
+    expect(await repo.backfillOpSkipped(), 0);
+  });
+
+  // ---------------- v2.0.5：作物不再有「默认图」 ----------------
+  test('作物导出不再带 image（知识库图片只属于条目）', () async {
+    final f = await Transfer.instance.buildFile('stage');
+    final crops = (f['crops'] as List).cast<Map>();
+    expect(crops, isNotEmpty);
+    for (final c in crops) {
+      expect(c.containsKey('image'), isFalse);
+    }
+  });
+
+  test('导入时同时接受 planting.data（开源快照/samples 用的标识）', () async {
+    final f = await Transfer.instance.buildFile('variety') as Map;
+    f['format'] = 'planting.data';
+    final dir = await Directory.systemTemp.createTemp('fmt_alias');
+    final file = File('${dir.path}/variety.json');
+    await file.writeAsString(jsonEncode(f));
+    final plan = await Transfer.instance.analyze(file.path, 'variety.json');
+    expect(plan.error, null);
+    expect(plan.kind, 'variety');
+    await dir.delete(recursive: true);
+  });
+
 }

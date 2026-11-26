@@ -149,6 +149,29 @@ Future<void> _seedDemo() async {
     intervalDays: 7,
     nextDueAt: d(0),
   ));
+
+  // 阶段提醒（templateId 非空）+ 同一次为两个批次创建 → 面板里合并成一行
+  await repo.saveReminder(Reminder(
+    id: 'demo_m3',
+    batchId: 'demo_b1',
+    kind: '施药',
+    title: '白粉病预防',
+    intervalDays: 5,
+    nextDueAt: d(1),
+    templateId: 'sr_strawberry_05_a#1',
+    notes: '重点喷叶背',
+  ));
+  await repo.saveReminder(Reminder(
+    id: 'demo_m4',
+    batchId: 'demo_b2',
+    kind: '施药',
+    title: '白粉病预防',
+    intervalDays: 5,
+    nextDueAt: d(1),
+    templateId: 'sr_strawberry_05_a#1',
+    groupId: 'demo_g1',
+    notes: '重点喷叶背',
+  ));
 }
 
 void main() {
@@ -194,6 +217,12 @@ void main() {
     await _flush(tester, 6);
     await _shot(tester, '../docs/images/app-real-batches.png');
 
+    // 底部导航「提醒」进提醒面板
+    await tester.tap(find.text('提醒').last);
+    await _flush(tester, 8);
+    await _shot(tester, '../docs/images/app-real-reminder-panel.png');
+    await _flush(tester, 4);
+
     await tester.tap(find.text('我的').last);
     await _flush(tester, 6);
     await _shot(tester, '../docs/images/app-real-me.png');
@@ -228,6 +257,15 @@ void main() {
     );
     await _flush(tester, 10);
 
+    // 记录行可能在首屏之外（提醒卡较高），先往下滚到出现为止
+    final list = find.byType(ListView).first;
+    for (var i = 0; i < 8 && find.byType(OpRecordTile).evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, -280));
+      await _flush(tester, 3);
+    }
+    expect(find.byType(OpRecordTile), findsWidgets);
+    await tester.ensureVisible(find.byType(OpRecordTile).first);
+    await _flush(tester, 3);
     // 「白粉病预防」同时是提醒标题，这里精确点「近 15 天操作」里的记录行
     await tester.tap(find.byType(OpRecordTile).first);
     await _flush(tester, 8);

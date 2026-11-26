@@ -20,7 +20,7 @@ class Db {
     final path = p.join(dir.path, 'planting.db');
     _db = await openDatabase(
       path,
-      version: 10,
+      version: 12,
       onUpgrade: (d, oldV, newV) async {
         if (oldV < 2) {
           await d.execute('ALTER TABLE crops ADD COLUMN image TEXT');
@@ -161,6 +161,24 @@ class Db {
             );
           }
         }
+        if (oldV < 12) {
+          // v2.0.3：提醒历史（一次完成=一条，批次是快照）
+          await d.execute('''
+            CREATE TABLE IF NOT EXISTS reminder_logs(
+              id TEXT PRIMARY KEY, groupId TEXT DEFAULT '', kind TEXT,
+              title TEXT, notes TEXT, doneAt TEXT, nextDueAt TEXT DEFAULT '',
+              batches TEXT, createdAt TEXT)''');
+          await d.execute(
+            'CREATE INDEX IF NOT EXISTS idx_rlog_done '
+            'ON reminder_logs(doneAt DESC)',
+          );
+        }
+        if (oldV < 11) {
+          // v1.9.2：作物图标支持自定义小图（emoji 仍作兜底）
+          try {
+            await d.execute('ALTER TABLE crops ADD COLUMN iconImage TEXT');
+          } catch (_) {}
+        }
       },
       onConfigure: (d) async {
         await d.execute('PRAGMA foreign_keys = OFF');
@@ -178,7 +196,7 @@ class Db {
       '''CREATE TABLE crops(
         id TEXT PRIMARY KEY, name TEXT, emoji TEXT, color TEXT,
         lifeCycle TEXT, cycleStart TEXT, unit TEXT, isDefault INTEGER DEFAULT 0,
-        enabled INTEGER DEFAULT 1, image TEXT, seasons TEXT,
+        enabled INTEGER DEFAULT 1, image TEXT, iconImage TEXT, seasons TEXT,
         sortOrder INTEGER DEFAULT 0, rev INTEGER DEFAULT 1,
         createdAt TEXT, updatedAt TEXT, deletedAt TEXT)''',
       '''CREATE TABLE varieties(
@@ -248,6 +266,10 @@ class Db {
       '''CREATE TABLE lib_meta(
         kind TEXT PRIMARY KEY, libraryId TEXT, name TEXT, updatedAt TEXT,
         revision INTEGER DEFAULT 1)''',
+      '''CREATE TABLE reminder_logs(
+        id TEXT PRIMARY KEY, groupId TEXT DEFAULT '', kind TEXT, title TEXT,
+        notes TEXT, doneAt TEXT, nextDueAt TEXT DEFAULT '', batches TEXT,
+        createdAt TEXT)''',
       '''CREATE TABLE settings(k TEXT PRIMARY KEY, v TEXT)''',
       'CREATE INDEX idx_stage_crop ON stages(crop)',
       'CREATE INDEX idx_rem_stage ON stage_reminders(stageId)',
@@ -257,6 +279,7 @@ class Db {
       'CREATE INDEX idx_mat_kind ON materials(kind)',
       'CREATE INDEX idx_pot_batch ON pots(batchId)',
       'CREATE INDEX idx_rem_batch ON reminders(batchId)',
+      'CREATE INDEX idx_rlog_done ON reminder_logs(doneAt DESC)',
     ];
     for (final s in sql) {
       await d.execute(s);
@@ -432,6 +455,7 @@ class Db {
     'isDefault': m['isDefault'] == true || m['isDefault'] == 1 ? 1 : 0,
     'enabled': m['enabled'] == false ? 0 : 1,
     'image': m['image'] ?? '',
+    'iconImage': m['iconImage'] ?? '',
     'sortOrder': m['sortOrder'] ?? 0,
     'rev': m['rev'] ?? 1,
     'createdAt': m['createdAt'] ?? '',
@@ -631,6 +655,20 @@ class Db {
     'createdAt': m['createdAt'] ?? '',
     'updatedAt': m['updatedAt'] ?? '',
     'deletedAt': m['deletedAt'],
+  };
+
+  Map<String, dynamic> _rlogRow(Map<String, dynamic> m) => {
+    'id': m['id'],
+    'groupId': m['groupId'] ?? '',
+    'kind': m['kind'] ?? '其他',
+    'title': m['title'] ?? '',
+    'notes': m['notes'] ?? '',
+    'doneAt': m['doneAt'] ?? '',
+    'nextDueAt': m['nextDueAt'] ?? '',
+    'batches': m['batches'] is String
+        ? m['batches']
+        : const JsonEncoder().convert(m['batches'] ?? const []),
+    'createdAt': m['createdAt'] ?? nowStamp(),
   };
 
   Map<String, dynamic> _reminderRow(Map<String, dynamic> m) => {

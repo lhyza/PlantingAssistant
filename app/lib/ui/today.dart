@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
+import '../core/ui_prefs.dart';
 import '../core/util.dart';
 import '../data/models.dart';
 import '../data/reminder_group.dart';
@@ -8,6 +9,8 @@ import '../data/repo.dart';
 import '../data/update_controller.dart';
 import 'app_state.dart';
 import 'batch_detail.dart';
+import 'batch_list.dart';
+import 'image_tile.dart';
 import 'record_list.dart';
 import 'reminder_sheet.dart';
 import 'update_page.dart';
@@ -50,14 +53,23 @@ class _TodayPageState extends State<TodayPage> {
   Future<void> _load() async {
     final cs = await repo.cropsForBrowse();
     final def = await repo.defaultCrop();
-    final sel = cropId.isEmpty ? (def?.id ?? '') : cropId;
-    final bs = sel.isEmpty ? <Batch>[] : await repo.batches(cropId: sel);
+    var sel = cropId;
+    if (sel.isEmpty) {
+      final saved = await repo.setting('ui.todayCrop');
+      final ok =
+          saved == kTodayAll || cs.any((c) => c.id == saved);
+      sel = ok ? saved! : (def?.id ?? '');
+    }
+    final allMode = sel == kTodayAll;
     // 提醒跨作物共享，批次名要从全部批次里查，否则其它作物的提醒会显示成「批次」
     final all = await repo.batches();
+    final bs = allMode
+        ? all
+        : (sel.isEmpty ? <Batch>[] : all.where((b) => b.crop == sel).toList());
     final rs = await repo.reminders();
     final rq = await repo.recordsSince(15, limit: 200);
     final map = <String, StageSnapshot>{};
-    for (final b in bs) {
+    for (final b in (allMode ? all : bs)) {
       map[b.id] = await repo.snapshot(b);
     }
     if (!mounted) return;
@@ -73,9 +85,19 @@ class _TodayPageState extends State<TodayPage> {
     });
   }
 
+  bool get allMode => cropId == kTodayAll;
+
   Crop? get crop {
+    if (allMode) return null;
     for (final c in crops) {
       if (c.id == cropId) return c;
+    }
+    return null;
+  }
+
+  Crop? _cropById(String id) {
+    for (final c in crops) {
+      if (c.id == id) return c;
     }
     return null;
   }
@@ -210,47 +232,23 @@ class _TodayPageState extends State<TodayPage> {
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: crops.map((c) {
-                    final on = c.id == cropId;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            cropId = c.id;
-                            stripBatchId = '';
-                          });
-                          _load();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 13,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: on
-                                ? colorOf(c.color).withValues(alpha: 0.10)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: on ? colorOf(c.color) : kLine,
-                              width: on ? 1.4 : 1,
-                            ),
-                          ),
-                          child: Text(
-                            '${c.emoji} ${c.name}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: on
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: on ? colorOf(c.color) : kInk2,
-                            ),
-                          ),
-                        ),
+                  children: [
+                    _cropChip(
+                      id: kTodayAll,
+                      emoji: '🌿',
+                      iconRef: '',
+                      name: '全部',
+                      color: kInk2,
+                    ),
+                    for (final c in crops)
+                      _cropChip(
+                        id: c.id,
+                        emoji: c.emoji,
+                        iconRef: c.iconImage,
+                        name: c.name,
+                        color: colorOf(c.color),
                       ),
-                    );
-                  }).toList(),
+                  ],
                 ),
               ),
             const SizedBox(height: 16),
@@ -332,14 +330,67 @@ class _TodayPageState extends State<TodayPage> {
     return best;
   }
 
+  Widget _cropChip({
+    required String id,
+    required String emoji,
+    required String iconRef,
+    required String name,
+    required Color color,
+  }) {
+    final on = id == cropId;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            cropId = id;
+            stripBatchId = '';
+          });
+          repo.setSetting('ui.todayCrop', id);
+          _load();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          decoration: BoxDecoration(
+            color: on ? color.withValues(alpha: 0.10) : Colors.white,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: on ? color : kLine, width: on ? 1.4 : 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CropIcon(
+                iconRef: iconRef,
+                emoji: emoji,
+                size: 16,
+                fontSize: 13,
+                radius: 4,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                name,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+                  color: on ? color : kInk2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _stageStrip() {
+    // 全部模式与单品种模式共用同一段渲染：一次只显示一个批次，
+    // 底部 chips 可以一个个点（v1.9.1 起不再有汇总条）。
     final b = _stripBatch;
     if (b == null) return const SizedBox.shrink();
     final s = snaps[b.id];
     final stage = s?.stage;
-    final seasonName = (crop?.seasonCount ?? 1) > 1 && b.season > 0
-        ? crop!.effSeasons[b.season - 1].name
-        : '';
+    // 全部模式下 crop 为 null，emoji 要看批次自己属于哪个作物
+    final bc = _cropById(b.crop);
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () async {
@@ -363,7 +414,13 @@ class _TodayPageState extends State<TodayPage> {
           children: [
             Row(
               children: [
-                Text(crop?.emoji ?? '🌿', style: const TextStyle(fontSize: 13)),
+                CropIcon(
+                  iconRef: bc?.iconImage ?? '',
+                  emoji: bc?.emoji ?? '🌿',
+                  size: 15,
+                  fontSize: 13,
+                  radius: 4,
+                ),
                 const SizedBox(width: 5),
                 Expanded(
                   child: Text(
@@ -390,11 +447,7 @@ class _TodayPageState extends State<TodayPage> {
               children: [
                 Expanded(
                   child: Text(
-                    stage == null
-                        ? '还没有配置阶段'
-                        : (seasonName.isEmpty
-                              ? stage.name
-                              : '$seasonName · ${stage.name}'),
+                    stage == null ? '还没有配置阶段' : stage.name,
                     style: const TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w700,
@@ -625,7 +678,11 @@ class _TodayPageState extends State<TodayPage> {
               (c) => ActionChip(
                 backgroundColor: Colors.white,
                 side: const BorderSide(color: kLine),
-                avatar: Text(c.emoji),
+                avatar: CropIcon(
+                  iconRef: c.iconImage,
+                  emoji: c.emoji,
+                  size: 18,
+                ),
                 label: Text(c.name, style: tSub),
                 onPressed: () {
                   setState(() {
@@ -691,13 +748,21 @@ class _TodayPageState extends State<TodayPage> {
                       ),
                     ),
                     const SizedBox(height: 2),
+                    // 单批次：批次名 · 类型 · 每 N 天
+                    // 多批次：类型 · 每 N 天 · 备注，批次单独一行列出全部涉及批次
                     Text(
-                      g.isGroup
-                          ? '${g.items.length} 个批次 · ${g.kind}${g.intervalDays > 1 ? ' · 每 ${g.intervalDays} 天' : ''}'
-                          : '${batchName(g.head.batchId)} · ${g.kind}${g.intervalDays > 1 ? ' · 每 ${g.intervalDays} 天' : ''}',
+                      '${g.kind}${g.intervalDays > 1 ? ' · 每 ${g.intervalDays} 天' : ''}'
+                      '${g.notes.trim().isEmpty ? '' : ' · ${g.notes.trim()}'}'
+                      '${g.isGroup ? '' : ' · ${batchName(g.head.batchId)}'}',
                       style: tSub,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                     ),
+                    if (g.isGroup)
+                      Text(
+                        '批次：${_groupBatches(g)}',
+                        style: tSub,
+                        maxLines: 2,
+                      ),
                   ],
                 ),
               ),
@@ -732,6 +797,16 @@ class _TodayPageState extends State<TodayPage> {
         ),
       ),
     );
+  }
+
+  /// 一组提醒涉及的全部批次名（按 items 顺序，去重）
+  String _groupBatches(ReminderGroup g) {
+    final seen = <String>{};
+    final names = <String>[];
+    for (final r in g.items) {
+      if (seen.add(r.batchId)) names.add(batchName(r.batchId));
+    }
+    return names.join('、');
   }
 
   String batchName(String id) {

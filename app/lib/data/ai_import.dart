@@ -392,6 +392,8 @@ Future<AiImportResult> applyAiPlan(AiImportPlan plan) async {
       res.failed++;
     }
   }
+  // 外部数据可能带全角括号，统一成「喷雾(叶背)」
+  await Repo.instance.normalizeMethodNames();
   return res;
 }
 

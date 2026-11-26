@@ -18,7 +18,10 @@ class CroppedPhoto {
 }
 
 /// 从相册选图 → 裁剪（默认自由比例）→ 存本地。
-Future<CroppedPhoto?> pickAndCropPhoto(BuildContext context) async {
+Future<CroppedPhoto?> pickAndCropPhoto(
+  BuildContext context, {
+  double? aspect,
+}) async {
   final picker = ImagePicker();
   final picked = await picker.pickImage(
     source: ImageSource.gallery,
@@ -27,7 +30,7 @@ Future<CroppedPhoto?> pickAndCropPhoto(BuildContext context) async {
     imageQuality: 92,
   );
   if (picked == null) return null;
-  return _cropBytes(context, await picked.readAsBytes());
+  return _cropBytes(context, await picked.readAsBytes(), aspect: aspect);
 }
 
 /// 调起相机拍一张 → 直接进裁剪页（用户确认：一步到位）。
@@ -43,11 +46,17 @@ Future<CroppedPhoto?> captureAndCropPhoto(BuildContext context) async {
   return _cropBytes(context, await picked.readAsBytes());
 }
 
-Future<CroppedPhoto?> _cropBytes(BuildContext context, Uint8List bytes) async {
+Future<CroppedPhoto?> _cropBytes(
+  BuildContext context,
+  Uint8List bytes, {
+  double? aspect,
+}) async {
   if (!context.mounted) return null;
   final res = await Navigator.push<_CropResult>(
     context,
-    MaterialPageRoute(builder: (_) => ImageCropperPage(bytes: bytes)),
+    MaterialPageRoute(
+      builder: (_) => ImageCropperPage(bytes: bytes, initialAspect: aspect),
+    ),
   );
   if (res == null) return null;
   final ref = await Images.save(res.bytes, ext: 'png');
@@ -67,9 +76,10 @@ Future<CroppedPhoto?> cropExistingPhoto(BuildContext context, String ref) async 
   return res;
 }
 
-/// 旧接口：只关心路径（知识库图片用），自由比例。
-Future<String> pickAndCropImage(BuildContext context) async {
-  final p = await pickAndCropPhoto(context);
+/// 旧接口：只关心路径（知识库/作物默认图用）。
+/// [aspect] 为裁剪页的初始比例；知识库与默认图都按 16:9 存（详情页封面是 16:9）。
+Future<String> pickAndCropImage(BuildContext context, {double? aspect}) async {
+  final p = await pickAndCropPhoto(context, aspect: aspect);
   return p?.ref ?? '';
 }
 
@@ -81,9 +91,16 @@ class _CropResult {
 }
 
 class ImageCropperPage extends StatefulWidget {
-  const ImageCropperPage({super.key, required this.bytes});
+  const ImageCropperPage({
+    super.key,
+    required this.bytes,
+    this.initialAspect,
+  });
 
   final Uint8List bytes;
+
+  /// 进页面时预选的比例（null = 自由）
+  final double? initialAspect;
 
   @override
   State<ImageCropperPage> createState() => _ImageCropperPageState();
@@ -104,6 +121,7 @@ class _ImageCropperPageState extends State<ImageCropperPage> {
   @override
   void initState() {
     super.initState();
+    _aspect = widget.initialAspect;
     _decode();
   }
 
@@ -297,6 +315,8 @@ class _ImageCropperPageState extends State<ImageCropperPage> {
                   _ratioBtn('1:1', 1),
                   const SizedBox(width: 8),
                   _ratioBtn('4:3', 4 / 3),
+                  const SizedBox(width: 8),
+                  _ratioBtn('16:9', 16 / 9),
                   const Spacer(),
                   TextButton(
                     onPressed: () => setState(() {

@@ -5,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
 import 'core/images.dart';
+import 'core/ui_prefs.dart';
 import 'data/notify.dart';
 import 'data/repo.dart';
 import 'data/update_controller.dart';
@@ -31,6 +32,15 @@ Future<void> main() async {
     await Repo.instance.normalizePestCrops();
     // v1.7 编辑阶段时漏传 season，可能把阶段存进了别的季：按 id 归位（幂等）
     await Repo.instance.normalizeStageSeasons();
+    // v1.8.4：「喷雾（叶背）」统一成半角括号（幂等）
+    await Repo.instance.normalizeMethodNames();
+    // 显示设置：批次名颜色、未施范围（可在「我的 → 显示设置」改）
+    await UiPrefs.load();
+    // v1.9：老记录补一份「未施」快照，只跑一次
+    if (await Repo.instance.setting('migrate.skipBackfill') != 'v1.9') {
+      await Repo.instance.backfillOpSkipped(acrossCrops: skipAcrossCrops);
+      await Repo.instance.setSetting('migrate.skipBackfill', 'v1.9');
+    }
   } catch (e, st) {
     debugPrint('db init failed: $e\n$st');
   }

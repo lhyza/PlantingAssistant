@@ -128,10 +128,19 @@ BoxDecoration cardDeco({Color? color, Color? border}) => BoxDecoration(
 );
 
 class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.text, {super.key, this.trailing, this.count});
+  const SectionTitle(
+    this.text, {
+    super.key,
+    this.trailing,
+    this.count,
+    this.leading,
+  });
   final String text;
   final Widget? trailing;
   final int? count;
+
+  /// 标题左侧的小图标（如批次页的作物图标）
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -148,6 +157,10 @@ class SectionTitle extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 7),
+          if (leading != null) ...[
+            leading!,
+            const SizedBox(width: 6),
+          ],
           Text(
             text,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),

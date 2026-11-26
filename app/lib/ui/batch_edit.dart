@@ -294,12 +294,10 @@ class _BatchEditPageState extends State<BatchEditPage> {
               children: [
                 const FormLabel('种什么', required: true),
                 ChoiceRow(
-                  options: crops.map((c) => '${c.emoji} ${c.name}').toList(),
-                  value: crop == null ? '' : '${crop!.emoji} ${crop!.name}',
+                  options: crops.map((c) => c.name).toList(),
+                  value: crop?.name ?? '',
                   onChanged: (v) {
-                    final c = crops.firstWhere(
-                      (e) => '${e.emoji} ${e.name}' == v,
-                    );
+                    final c = crops.firstWhere((e) => e.name == v);
                     _pickCrop(c.id);
                   },
                 ),

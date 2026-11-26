@@ -44,7 +44,7 @@ void main() {
     await Repo.instance.crops();
   });
 
-  testWidgets('首屏可渲染且底部 4 个 Tab 都在', (tester) async {
+  testWidgets('首屏可渲染且底部 5 个 Tab 都在', (tester) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);
@@ -54,6 +54,7 @@ void main() {
 
     expect(find.text('今天'), findsWidgets);
     expect(find.text('批次'), findsWidgets);
+    expect(find.text('提醒'), findsWidgets);
     expect(find.text('知识'), findsWidgets);
     expect(find.text('我的'), findsWidgets);
     expect(tester.takeException(), isNull);
@@ -73,6 +74,9 @@ void main() {
 
     final about = find.text('关于');
     expect(about, findsWidgets);
+    // v1.8.4 起「管理」组多了颜色设置，关于可能被底部导航遮住，先滚到可见
+    await tester.ensureVisible(about.last);
+    await _flush(tester, 2);
     await tester.tap(about.last);
     await _flush(tester);
 

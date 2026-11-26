@@ -124,8 +124,9 @@ class _KnowledgePageState extends State<KnowledgePage>
                               width: on ? 1.4 : 1,
                             ),
                           ),
-                          child: Text(
-                            '${c.emoji} ${c.name}',
+                          child: cropLabel(
+                            c,
+                            size: 15,
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: on
@@ -195,7 +196,6 @@ class _KnowledgePageState extends State<KnowledgePage>
           title: v.name,
           badge: v.category,
           image: v.image,
-          cropImage: _cropImage,
           pending: v.imgPending,
           onImageTap: v.image.isEmpty ? null : () => _cropImageOf(
             v.image,
@@ -240,7 +240,6 @@ class _KnowledgePageState extends State<KnowledgePage>
           title: p.name,
           badge: p.category,
           image: p.image,
-          cropImage: _cropImage,
           pending: p.imgPending,
           onImageTap: p.image.isEmpty ? null : () => _cropImageOf(
             p.image,
@@ -277,7 +276,6 @@ class _KnowledgePageState extends State<KnowledgePage>
           title: s.name,
           badge: s.category,
           image: s.image,
-          cropImage: _cropImage,
           tags: [if (s.crop == '通用') '通用'],
           note: s.description,
           incomplete: s.incomplete,
@@ -305,7 +303,6 @@ class _KnowledgePageState extends State<KnowledgePage>
           title: m.name,
           badge: '',
           image: m.image,
-          cropImage: '',
           tags: [],
           tags2: [
             if (m.methodsText.isNotEmpty) m.methodsText,
@@ -344,13 +341,6 @@ class _KnowledgePageState extends State<KnowledgePage>
         })
         .join('、');
     return '禁用：$names';
-  }
-
-  String get _cropImage {
-    for (final c in crops) {
-      if (c.id == cropId) return c.image;
-    }
-    return '';
   }
 
   Future<void> _cropImageOf(
@@ -535,7 +525,6 @@ class _KnowledgePageState extends State<KnowledgePage>
     required String title,
     required String badge,
     String image = '',
-    String cropImage = '',
     required List<String> tags,
     List<String> tags2 = const [],
     List<Widget> tagWidgets2 = const [],
@@ -591,7 +580,6 @@ class _KnowledgePageState extends State<KnowledgePage>
                       children: [
                         LocalImage(
                           ref: image,
-                          fallbackRef: cropImage,
                           width: 54,
                           height: 54,
                           radius: 12,
