@@ -64,6 +64,31 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
           ),
           const SizedBox(height: 18),
           const SectionTitle('记录偏好'),
+          ValueListenableBuilder<bool>(
+            valueListenable: showSkippedRecords,
+            builder: (_, on, __) => Container(
+              decoration: cardDeco(),
+              child: SwitchListTile(
+                value: on,
+                activeThumbColor: kRed,
+                contentPadding: const EdgeInsets.fromLTRB(14, 2, 8, 2),
+                title: Text(
+                  '显示「未施」批次',
+                  style: tBody.copyWith(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  '关闭后，操作记录列表、详情和记一笔预览都不显示未施批次；数据仍会照常记录。',
+                  style: tTiny.copyWith(color: kInk3),
+                ),
+                onChanged: (v) async {
+                  await UiPrefs.saveShowSkipped(v);
+                  if (!mounted) return;
+                  setState(() {});
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             decoration: cardDeco(),
@@ -147,7 +172,10 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: tBody.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    title,
+                    style: tBody.copyWith(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     '$sub · ${hexOfColor(color)}',
@@ -189,8 +217,10 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
-      builder: (ctx) => _PickSheet(initial: cur, defaultColor:
-          isApplied ? kDefaultAppliedColor : kDefaultSkippedColor),
+      builder: (ctx) => _PickSheet(
+        initial: cur,
+        defaultColor: isApplied ? kDefaultAppliedColor : kDefaultSkippedColor,
+      ),
     );
     if (picked == null) return;
     if (isApplied) {
@@ -214,8 +244,9 @@ class _PickSheet extends StatefulWidget {
 
 class _PickSheetState extends State<_PickSheet> {
   late Color value = widget.initial;
-  late final TextEditingController ctrl =
-      TextEditingController(text: hexOfColor(widget.initial));
+  late final TextEditingController ctrl = TextEditingController(
+    text: hexOfColor(widget.initial),
+  );
 
   @override
   void dispose() {

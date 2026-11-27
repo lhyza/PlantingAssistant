@@ -4,6 +4,7 @@ import '../core/changelog.dart';
 import '../core/theme.dart';
 import '../core/version.dart';
 import '../data/notify.dart';
+import '../data/reminder_group.dart';
 import '../data/repo.dart';
 import '../data/update_controller.dart';
 import 'common.dart';
@@ -40,7 +41,7 @@ class _MePageState extends State<MePage> {
     if (mounted) {
       setState(() {
         stats = s;
-        notifyCount = rems.length;
+        notifyCount = groupReminders(rems).length;
         notifyOn = on != '0';
       });
     }
@@ -159,7 +160,9 @@ class _MePageState extends State<MePage> {
               () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const UpdatePage(autoCheck: true)),
+                  MaterialPageRoute(
+                    builder: (_) => const UpdatePage(autoCheck: true),
+                  ),
                 );
                 await _load();
               },
@@ -218,8 +221,13 @@ class _MePageState extends State<MePage> {
     );
   }
 
-  Widget _tile(IconData icon, String title, String sub, VoidCallback onTap,
-      {bool dot = false}) {
+  Widget _tile(
+    IconData icon,
+    String title,
+    String sub,
+    VoidCallback onTap, {
+    bool dot = false,
+  }) {
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -249,7 +257,10 @@ class _MePageState extends State<MePage> {
                 width: 8,
                 height: 8,
                 margin: const EdgeInsets.only(right: 6),
-                decoration: const BoxDecoration(color: kRed, shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                  color: kRed,
+                  shape: BoxShape.circle,
+                ),
               ),
             const Icon(Icons.chevron_right, size: 18, color: kInk3),
           ],
@@ -422,8 +433,12 @@ class _AboutPageState extends State<AboutPage> {
           if (showMore) ...[
             const SizedBox(height: 18),
             Center(child: Text('包名 cn.zhongzhizhushou.planting', style: tTiny)),
-            Center(child: Text('版本 $kAppVersion ($kVersionCode)', style: tTiny)),
-            Center(child: Text('数据格式 schemaVersion $kDataSchema', style: tTiny)),
+            Center(
+              child: Text('版本 $kAppVersion ($kVersionCode)', style: tTiny),
+            ),
+            Center(
+              child: Text('数据格式 schemaVersion $kDataSchema', style: tTiny),
+            ),
             const Center(child: Text('离线运行 · 不含网络权限', style: tTiny)),
           ],
           const SizedBox(height: 26),
@@ -479,7 +494,9 @@ class _AboutPageState extends State<AboutPage> {
                       padding: EdgeInsets.only(top: 6, right: 7),
                       child: Icon(Icons.circle, size: 4, color: kInk3),
                     ),
-                    Expanded(child: Text(t, style: tBody.copyWith(height: 1.5))),
+                    Expanded(
+                      child: Text(t, style: tBody.copyWith(height: 1.5)),
+                    ),
                   ],
                 ),
               ),

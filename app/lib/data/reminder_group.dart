@@ -73,3 +73,11 @@ List<ReminderGroup> groupReminders(List<Reminder> rs) {
   });
   return all;
 }
+
+/// 角标口径：已逾期 + 今天到期的提醒「组」数（同 groupId 只算 1）。
+int dueReminderGroupCount(Iterable<Reminder> all, String today) {
+  final due = all.where(
+    (r) => r.nextDueAt.isNotEmpty && r.nextDueAt.compareTo(today) <= 0,
+  );
+  return groupReminders(due.toList()).length;
+}

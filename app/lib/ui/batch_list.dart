@@ -9,7 +9,6 @@ import 'batch_detail.dart';
 import 'batch_edit.dart';
 import 'common.dart';
 import 'image_tile.dart';
-import 'today.dart' show kindFg;
 
 class BatchListPage extends StatefulWidget {
   const BatchListPage({super.key});
@@ -136,15 +135,9 @@ class _BatchListPageState extends State<BatchListPage> {
                       setState(() => cropId = '');
                     }),
                     ...crops.map(
-                      (c) => _chip(
-                        c.name,
-                        c.id,
-                        cropId == c.id,
-                        () {
-                          setState(() => cropId = c.id);
-                        },
-                        crop: c,
-                      ),
+                      (c) => _chip(c.name, c.id, cropId == c.id, () {
+                        setState(() => cropId = c.id);
+                      }, crop: c),
                     ),
                   ],
                 ),
@@ -348,7 +341,7 @@ class _BatchListPageState extends State<BatchListPage> {
                       runSpacing: 6,
                       children: [
                         Pill(
-                          '${s?.dayInCycle ?? 0} 天',
+                          '${repo.plantedDays(b)}天',
                           bg: const Color(0xFFF5F3F0),
                           fg: kInk2,
                         ),
@@ -358,7 +351,11 @@ class _BatchListPageState extends State<BatchListPage> {
                           fg: kInk2,
                         ),
                         if (stage != null)
-                          Pill(stage.name, bg: kGreenBg, fg: kGreen),
+                          Pill(
+                            '${stage.name}${s?.dayInStage ?? 0}/${stage.days}',
+                            bg: kGreenBg,
+                            fg: kGreen,
+                          ),
                         if ((openReminders[b.id] ?? 0) > 0)
                           Pill(
                             '${openReminders[b.id]} 条待办',

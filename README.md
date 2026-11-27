@@ -5,7 +5,7 @@
 - 应用名：**种植助手**
 - 包名：`cn.zhongzhizhushou.planting`
 - 技术栈：Flutter 3.50 / Dart 3.14 + SQLite（sqflite）+ 本地通知
-- 当前版本：**2.0.6**（versionCode 23，数据库 v12，导出文件 schemaVersion 6）
+- 当前版本：**2.0.7**（versionCode 24，数据库 v12，导出文件 schemaVersion 6）
 
 ---
 

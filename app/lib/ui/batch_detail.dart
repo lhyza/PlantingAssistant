@@ -53,11 +53,7 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
     final s = await repo.snapshot(batch);
     final rs = await repo.reminders(batchId: batch.id);
     final ops = await repo.records(batchId: batch.id, limit: 5);
-    final photos = await repo.records(
-      batchId: batch.id,
-      photo: true,
-      limit: 5,
-    );
+    final photos = await repo.records(batchId: batch.id, photo: true, limit: 5);
     final opN = await repo.recordCount(batchId: batch.id);
     final photoN = await repo.recordCount(batchId: batch.id, photo: true);
     final ps = await repo.potStats(batch.id);
@@ -140,9 +136,7 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
               if (crop?.isPerennial == true)
                 PopupMenuItem(
                   value: 'newyear',
-                  child: Text(
-                    (crop?.seasonCount ?? 1) > 1 ? '开启新一季' : '开启新一年',
-                  ),
+                  child: Text((crop?.seasonCount ?? 1) > 1 ? '开启新一季' : '开启新一年'),
                 ),
               const PopupMenuItem(value: 'delete', child: Text('删除批次')),
             ],
@@ -215,8 +209,8 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
                 const SizedBox(height: 4),
                 Text(
                   crop?.isPerennial == true
-                      ? '本年度第 ${snap?.dayInCycle ?? 0} 天 · 萌芽日 ${batch.cycleStartDate}'
-                      : '种植第 ${snap?.dayInCycle ?? 0} 天 · 定植 ${batch.plantDate}',
+                      ? '本年度第${repo.plantedDays(batch)}天 · 萌芽日 ${batch.cycleStartDate}'
+                      : '种植第${repo.plantedDays(batch)}天 · 定植 ${batch.plantDate}',
                   style: tSub,
                 ),
                 if ((crop?.seasonCount ?? 1) > 1) ...[
@@ -262,19 +256,13 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          '${stage.name}（${stage.days} 天）',
+                          '${stage.name}${snap!.dayInStage}/${stage.days}',
                           style: const TextStyle(
                             fontSize: 15.5,
                             fontWeight: FontWeight.w700,
                             color: kGreen,
                           ),
                         ),
-                      ),
-                      Pill(
-                        '第 ${snap!.dayInStage}/${stage.days} 天',
-                        bg: Colors.white,
-                        fg: kGreen,
-                        border: kGreen.withValues(alpha: 0.25),
                       ),
                     ],
                   ),
@@ -520,62 +508,67 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
           onChanged: _load,
         ),
         child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
-        decoration: cardDeco(),
-        child: Row(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: kindBgOf(r.kind),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Center(
-                child: Text(
-                  kindEmoji(r.kind),
-                  style: const TextStyle(fontSize: 13),
+          padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+          decoration: cardDeco(),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: kindBgOf(r.kind),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Center(
+                  child: Text(
+                    kindEmoji(r.kind),
+                    style: const TextStyle(fontSize: 13),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    r.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      r.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${r.kind}${r.intervalDays > 1 ? ' · 每 ${r.intervalDays} 天' : ''} · 下次 ${r.nextDueAt}',
-                    style: tSub,
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      '${r.kind}${r.intervalDays > 1 ? ' · 每 ${r.intervalDays} 天' : ''} · 下次 ${r.nextDueAt}',
+                      style: tSub,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            if (overdue)
-              const Pill('已逾期', bg: kRedBg, fg: kRedDeep)
-            else if (r.nextDueAt == todayStr())
-              const Pill('今天', bg: kAmberBg, fg: kAmber),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              icon: const Icon(
-                Icons.check_circle_outline,
-                color: kGreen,
-                size: 21,
+              if (overdue)
+                const Pill('已逾期', bg: kRedBg, fg: kRedDeep)
+              else if (r.nextDueAt == todayStr())
+                const Pill('今天', bg: kAmberBg, fg: kAmber),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.check_circle_outline,
+                  color: kGreen,
+                  size: 21,
+                ),
+                onPressed: () async {
+                  await openCompleteReminder(
+                    context,
+                    ReminderGroup([r]),
+                    batchName: (_) => batchName,
+                    onChanged: _load,
+                  );
+                  _load();
+                },
               ),
-              onPressed: () async {
-                await finishReminder(context, r);
-                _load();
-              },
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -676,11 +669,8 @@ class _BatchDetailPageState extends State<BatchDetailPage> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => RecordDetailPage(
-                items: list,
-                index: i,
-                photo: photo,
-              ),
+              builder: (_) =>
+                  RecordDetailPage(items: list, index: i, photo: photo),
             ),
           ),
           child: RecordTile(record: r),

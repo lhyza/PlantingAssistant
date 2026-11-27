@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
 import '../core/util.dart';
-import '../data/models.dart';
 import '../data/reminder_group.dart';
 import '../data/repo.dart';
 import 'app_state.dart';
@@ -69,7 +68,9 @@ class _ReminderPanelPageState extends State<ReminderPanelPage> {
 
     // 窗口：到期日 ≤ 今天+15（逾期不限下限，自然全部命中）
     final rows = all
-        .where((r) => r.nextDueAt.isNotEmpty && r.nextDueAt.compareTo(limit) <= 0)
+        .where(
+          (r) => r.nextDueAt.isNotEmpty && r.nextDueAt.compareTo(limit) <= 0,
+        )
         .toList();
 
     final groups = groupReminders(rows);
@@ -90,9 +91,7 @@ class _ReminderPanelPageState extends State<ReminderPanelPage> {
       stage = _sorted(staged);
       loading = false;
     });
-    reminderBadge.value = all.where((r) {
-      return r.nextDueAt.isNotEmpty && r.nextDueAt.compareTo(todayStr()) <= 0;
-    }).length;
+    reminderBadge.value = dueReminderGroupCount(all, todayStr());
   }
 
   /// 已逾期 → 今天 → 未来；同状态内按到期日、标题
@@ -218,28 +217,28 @@ class _ReminderPanelPageState extends State<ReminderPanelPage> {
                   ),
                   const SizedBox(height: 12),
                   SectionTitle('自定义提醒', count: custom.length),
-                    if (custom.isEmpty)
-                      const EmptyHint(text: '还没有自定义提醒，点右上角「新建」加一条')
-                    else
-                      for (final g in custom) _card(g, today),
-                    const SizedBox(height: 14),
-                    SectionTitle(
-                      '近 15 天提醒',
-                      count: stage.length,
-                      trailing: TextButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ReminderHistoryPage(),
-                          ),
+                  if (custom.isEmpty)
+                    const EmptyHint(text: '还没有自定义提醒，点右上角「新建」加一条')
+                  else
+                    for (final g in custom) _card(g, today),
+                  const SizedBox(height: 14),
+                  SectionTitle(
+                    '近 15 天提醒',
+                    count: stage.length,
+                    trailing: TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ReminderHistoryPage(),
                         ),
-                        child: const Text('历史 ›'),
                       ),
+                      child: const Text('历史 ›'),
                     ),
-                    if (stage.isEmpty)
-                      const EmptyHint(text: '给批次点「生成阶段提醒」后，这里会自动出现')
-                    else
-                      for (final g in stage) _card(g, today),
+                  ),
+                  if (stage.isEmpty)
+                    const EmptyHint(text: '给批次点「生成阶段提醒」后，这里会自动出现')
+                  else
+                    for (final g in stage) _card(g, today),
                 ],
               ),
       ),
@@ -254,67 +253,67 @@ class _ReminderPanelPageState extends State<ReminderPanelPage> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () async {
-          await openReminderSheet(
-            context,
-            g,
-            batchName: _batchName,
-            onChanged: _load,
-          );
-          _load();
-        },
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 第 1 行：徽章 + 标题 + 状态
-              Row(
-                children: [
-                  Pill(g.kind, bg: kindBg(g.kind), fg: kindFg(g.kind)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      g.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+          borderRadius: BorderRadius.circular(16),
+          onTap: () async {
+            await openReminderSheet(
+              context,
+              g,
+              batchName: _batchName,
+              onChanged: _load,
+            );
+            _load();
+          },
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 第 1 行：徽章 + 标题 + 状态
+                Row(
+                  children: [
+                    Pill(g.kind, bg: kindBg(g.kind), fg: kindFg(g.kind)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        g.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _statusText(g),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _statusColor(g, today),
+                    const SizedBox(width: 8),
+                    Text(
+                      _statusText(g),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: _statusColor(g, today),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // 第 2 行：循环 · 下次 · 备注
-              Text(
-                _line2(g),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: tSub,
-              ),
-              const SizedBox(height: 4),
-              // 第 3 行：批次
-              Text(
-                '批次：${_batchText(g)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: tTiny,
-              ),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // 第 2 行：循环 · 下次 · 备注
+                Text(
+                  _line2(g),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: tSub,
+                ),
+                const SizedBox(height: 4),
+                // 第 3 行：批次
+                Text(
+                  '批次：${_batchText(g)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: tTiny,
+                ),
+              ],
+            ),
           ),
-        ),
         ),
       ),
     );
@@ -330,14 +329,8 @@ Future<void> refreshReminderBadge() async {
   if (reminderBadge.value != n) reminderBadge.value = n;
 }
 
-/// 全部批次里「已逾期 + 今天」的提醒条数
+/// 全部批次里「已逾期 + 今天」的提醒组数
 Future<int> reminderBadgeCount() async {
   final list = await Repo.instance.reminders();
-  final today = todayStr();
-  var n = 0;
-  for (final r in list) {
-    if (r.nextDueAt.isEmpty) continue;
-    if (r.nextDueAt.compareTo(today) <= 0) n++;
-  }
-  return n;
+  return dueReminderGroupCount(list, todayStr());
 }

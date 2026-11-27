@@ -9,10 +9,12 @@ import '../data/repo.dart';
 const Color kDefaultAppliedColor = Color(0xFFC2410C); // 深橙
 const Color kDefaultSkippedColor = Color(0xFFE0862B); // 橙
 
-final ValueNotifier<Color> appliedNameColor =
-    ValueNotifier<Color>(kDefaultAppliedColor);
-final ValueNotifier<Color> skippedNameColor =
-    ValueNotifier<Color>(kDefaultSkippedColor);
+final ValueNotifier<Color> appliedNameColor = ValueNotifier<Color>(
+  kDefaultAppliedColor,
+);
+final ValueNotifier<Color> skippedNameColor = ValueNotifier<Color>(
+  kDefaultSkippedColor,
+);
 
 /// 「未施」的范围：
 /// - `all`（默认）：别的作物里这次没处理的批次也算未施
@@ -24,6 +26,9 @@ const String kSkipScopeCrop = 'crop';
 const String kTodayAll = 'all';
 
 final ValueNotifier<String> skipScope = ValueNotifier<String>(kSkipScopeAll);
+
+/// 操作记录列表/详情里是否显示「未施」批次（默认关，数据照常记录）。
+final ValueNotifier<bool> showSkippedRecords = ValueNotifier<bool>(false);
 
 bool get skipAcrossCrops => skipScope.value != kSkipScopeCrop;
 
@@ -43,12 +48,14 @@ class UiPrefs {
   static Future<void> load() async {
     appliedNameColor.value =
         parseHexColor(await Repo.instance.setting('color.applied') ?? '') ??
-            kDefaultAppliedColor;
+        kDefaultAppliedColor;
     skippedNameColor.value =
         parseHexColor(await Repo.instance.setting('color.skipped') ?? '') ??
-            kDefaultSkippedColor;
+        kDefaultSkippedColor;
     final scope = await Repo.instance.setting('skip.scope');
     skipScope.value = scope == kSkipScopeCrop ? kSkipScopeCrop : kSkipScopeAll;
+    showSkippedRecords.value =
+        (await Repo.instance.setting('record.showSkipped')) == '1';
   }
 
   static Future<void> saveApplied(Color c) async {
@@ -66,9 +73,15 @@ class UiPrefs {
     await Repo.instance.setSetting('skip.scope', skipScope.value);
   }
 
+  static Future<void> saveShowSkipped(bool v) async {
+    showSkippedRecords.value = v;
+    await Repo.instance.setSetting('record.showSkipped', v ? '1' : '0');
+  }
+
   static Future<void> reset() async {
     await saveApplied(kDefaultAppliedColor);
     await saveSkipped(kDefaultSkippedColor);
     await saveSkipScope(kSkipScopeAll);
+    await saveShowSkipped(false);
   }
 }

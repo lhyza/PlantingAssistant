@@ -138,9 +138,11 @@ class _RecordListPageState extends State<RecordListPage> {
     final count = total > 0 ? '共 $total 条' : '';
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title.isEmpty
-            ? (widget.photo ? '拍照记录' : '操作记录')
-            : widget.title),
+        title: Text(
+          widget.title.isEmpty
+              ? (widget.photo ? '拍照记录' : '操作记录')
+              : widget.title,
+        ),
         actions: [
           if (count.isNotEmpty)
             Padding(
@@ -232,6 +234,7 @@ class RecordDetailPage extends StatefulWidget {
     this.photo = false,
     this.batchNames = const {},
   });
+
   /// 当前要显示的那一组记录（同一批次内通常只有 1 条；
   /// 合并模式下是同一次操作里的多条）。
   final List<GardenRecord> items;
@@ -322,22 +325,27 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
                 ),
               ],
             ),
-            if (skipped.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Pill('本次忽略', bg: kAmberBg, fg: kAmber),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      skipped.map(_name).join('、'),
-                      style: tBody.copyWith(color: kAmber),
+            ValueListenableBuilder<bool>(
+              valueListenable: showSkippedRecords,
+              builder: (_, show, __) => !show || skipped.isEmpty
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Pill('本次忽略', bg: kAmberBg, fg: kAmber),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              skipped.map(_name).join('、'),
+                              style: tBody.copyWith(color: kAmber),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ],
         ),
       ),
@@ -414,11 +422,7 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
         children: [
           Row(
             children: [
-              Pill(
-                r.type,
-                bg: kindBgOf(r.type),
-                fg: kindFgOf(r.type),
-              ),
+              Pill(r.type, bg: kindBgOf(r.type), fg: kindFgOf(r.type)),
               const Spacer(),
               Text(r.date, style: tSub),
             ],
@@ -436,7 +440,11 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: LocalImage(ref: img, height: 240, width: double.infinity),
+                  child: LocalImage(
+                    ref: img,
+                    height: 240,
+                    width: double.infinity,
+                  ),
                 ),
               ),
             const SizedBox(height: 4),
@@ -453,9 +461,10 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
                     children: [
                       Expanded(child: Text(p.name, style: tBody)),
                       Text(
-                        [p.dosage, p.method]
-                            .where((x) => x.isNotEmpty)
-                            .join(' · '),
+                        [
+                          p.dosage,
+                          p.method,
+                        ].where((x) => x.isNotEmpty).join(' · '),
                         style: tSub,
                       ),
                     ],
@@ -465,9 +474,11 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
           ] else if (r.productName.isNotEmpty) ...[
             const SectionTitle('产品'),
             Text(
-              [r.productName, r.dosage, r.method]
-                  .where((x) => x.isNotEmpty)
-                  .join(' · '),
+              [
+                r.productName,
+                r.dosage,
+                r.method,
+              ].where((x) => x.isNotEmpty).join(' · '),
               style: tBody,
             ),
           ],
@@ -532,7 +543,12 @@ class RecordTile extends StatelessWidget {
           if (photo && r.images.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: LocalImage(ref: r.images.first, width: 56, height: 56, radius: 10),
+              child: LocalImage(
+                ref: r.images.first,
+                width: 56,
+                height: 56,
+                radius: 10,
+              ),
             )
           else
             Container(
@@ -585,9 +601,11 @@ class RecordTile extends StatelessWidget {
                   )
                 else if (r.productName.isNotEmpty)
                   Text(
-                    [r.productName, r.dosage, r.method]
-                        .where((e) => e.isNotEmpty)
-                        .join(' · '),
+                    [
+                      r.productName,
+                      r.dosage,
+                      r.method,
+                    ].where((e) => e.isNotEmpty).join(' · '),
                     style: tSub,
                   ),
                 if (r.notes.isNotEmpty)
@@ -627,93 +645,99 @@ class OpRecordTile extends StatelessWidget {
     final applied = records.map((e) => _name(e.batchId)).toList();
     final skipped = r.opSkipped.map(_name).toList();
     return ListenableBuilder(
-      listenable: Listenable.merge([appliedNameColor, skippedNameColor]),
+      listenable: Listenable.merge([
+        appliedNameColor,
+        skippedNameColor,
+        showSkippedRecords,
+      ]),
       builder: (context, _) => Container(
-      padding: const EdgeInsets.all(12),
-      decoration: cardDeco(),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color: kindBgOf(r.type),
-              borderRadius: BorderRadius.circular(7),
-            ),
-            child: Text(
-              r.type,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: kindFgOf(r.type),
+        padding: const EdgeInsets.all(12),
+        decoration: cardDeco(),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: kindBgOf(r.type),
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Text(
+                r.type,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: kindFgOf(r.type),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        r.title.isEmpty ? r.type : r.title,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          r.title.isEmpty ? r.type : r.title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
+                      Text(r.date, style: tTiny),
+                    ],
+                  ),
+                  if (r.products.isNotEmpty)
+                    Text(
+                      r.products
+                          .map(
+                            (e) => [
+                              e.name,
+                              e.dosage,
+                              e.methodsText.isEmpty ? e.method : e.methodsText,
+                            ].where((x) => x.isNotEmpty).join(' '),
+                          )
+                          .where((e) => e.isNotEmpty)
+                          .join(' ＋ '),
+                      style: tSub,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  else if (r.productName.isNotEmpty)
+                    Text(
+                      [
+                        r.productName,
+                        r.dosage,
+                        r.method,
+                      ].where((e) => e.isNotEmpty).join(' · '),
+                      style: tSub,
                     ),
-                    Text(r.date, style: tTiny),
-                  ],
-                ),
-                if (r.products.isNotEmpty)
-                  Text(
-                    r.products
-                        .map(
-                          (e) => [
-                            e.name,
-                            e.dosage,
-                            e.methodsText.isEmpty ? e.method : e.methodsText,
-                          ].where((x) => x.isNotEmpty).join(' '),
-                        )
-                        .where((e) => e.isNotEmpty)
-                        .join(' ＋ '),
-                    style: tSub,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  )
-                else if (r.productName.isNotEmpty)
-                  Text(
-                    [r.productName, r.dosage, r.method]
-                        .where((e) => e.isNotEmpty)
-                        .join(' · '),
-                    style: tSub,
-                  ),
-                if (r.notes.isNotEmpty)
-                  Text(
-                    r.notes,
-                    style: tSub,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                if (applied.isNotEmpty)
-                  Text(
-                    '${multi ? '施用：' : ''}${applied.join('、')}',
-                    style: tSub.copyWith(color: appliedNameColor.value),
-                  ),
-                if (skipped.isNotEmpty)
-                  Text(
-                    '未施：${skipped.join('、')}',
-                    style: tSub.copyWith(color: skippedNameColor.value),
-                  ),
-              ],
+                  if (r.notes.isNotEmpty)
+                    Text(
+                      r.notes,
+                      style: tSub,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  if (applied.isNotEmpty)
+                    Text(
+                      '${multi ? '施用：' : ''}${applied.join('、')}',
+                      style: tSub.copyWith(color: appliedNameColor.value),
+                    ),
+                  if (showSkippedRecords.value && skipped.isNotEmpty)
+                    Text(
+                      '未施：${skipped.join('、')}',
+                      style: tSub.copyWith(color: skippedNameColor.value),
+                    ),
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right, size: 16, color: kInk3),
-        ],
-      ),
+            const Icon(Icons.chevron_right, size: 16, color: kInk3),
+          ],
+        ),
       ),
     );
   }

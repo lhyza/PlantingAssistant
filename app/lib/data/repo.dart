@@ -102,8 +102,11 @@ class Repo {
     if (cs.isEmpty) return 0;
     final byName = {for (final c in cs) c.name: c.id};
     final d = await Db.instance.db;
-    final rows = await d.query('pests', columns: ['id', 'crops'],
-        where: 'deletedAt IS NULL');
+    final rows = await d.query(
+      'pests',
+      columns: ['id', 'crops'],
+      where: 'deletedAt IS NULL',
+    );
     var n = 0;
     for (final r in rows) {
       final raw = (r['crops'] as String?) ?? '';
@@ -118,8 +121,12 @@ class Repo {
         }
       }
       if (!changed) continue;
-      await d.update('pests', {'crops': s, 'updatedAt': nowStamp()},
-          where: 'id = ?', whereArgs: [r['id']]);
+      await d.update(
+        'pests',
+        {'crops': s, 'updatedAt': nowStamp()},
+        where: 'id = ?',
+        whereArgs: [r['id']],
+      );
       n++;
     }
     return n;
@@ -129,8 +136,7 @@ class Repo {
     final d = await _d;
     final rows = await d.query(
       'pests',
-      where:
-          "deletedAt IS NULL AND (crop = '通用' OR crops LIKE ? OR (crops IS NULL AND crop = ?))",
+      where: "deletedAt IS NULL AND (crop = '通用' OR crops LIKE ? OR (crops IS NULL AND crop = ?))",
       whereArgs: ['%"$cropId"%', cropId],
       orderBy: 'sortOrder ASC, name ASC',
     );
@@ -293,7 +299,8 @@ class Repo {
         skipped++;
         continue;
       }
-      final nid = '${cropId}_s${toSeason.toString().padLeft(2, '0')}_'
+      final nid =
+          '${cropId}_s${toSeason.toString().padLeft(2, '0')}_'
           '${copied + 1}';
       final copy = Stage.fromMap({
         ...st.toMap(),
@@ -623,7 +630,10 @@ class Repo {
   ///
   /// 只处理最近 [days] 天、`opSkipped` 为空的 施肥/施药/浇水 记录；
   /// 候选批次用「创建时间不晚于记录日期」近似“当时已存在”，并排除归档与整盆死光。
-  Future<int> backfillOpSkipped({int days = 30, bool acrossCrops = true}) async {
+  Future<int> backfillOpSkipped({
+    int days = 30,
+    bool acrossCrops = true,
+  }) async {
     final d = await _d;
     final from = fmtDay(
       dateOnly(DateTime.now().subtract(Duration(days: days - 1))),
@@ -663,8 +673,9 @@ class Repo {
       for (final b in allBatches) {
         if (targets.contains(b.id)) continue;
         if (!acrossCrops && !crops.contains(b.crop)) continue;
-        final bornDay =
-          b.createdAt.length >= 10 ? b.createdAt.substring(0, 10) : '';
+        final bornDay = b.createdAt.length >= 10
+            ? b.createdAt.substring(0, 10)
+            : '';
         if (bornDay.isNotEmpty && bornDay.compareTo(day) > 0) continue;
         skipped.add(b.id);
       }
@@ -714,22 +725,18 @@ class Repo {
     final t = nowStamp();
     for (var i = 1; i <= target; i++) {
       if (exist.contains(i)) continue;
-      await d.insert(
-        'pots',
-        {
-          'id': '${b.id}_pot_$i',
-          'batchId': b.id,
-          'idx': i,
-          'state': 'alive',
-          'note': '',
-          'changedAt': '',
-          'rev': 1,
-          'createdAt': t,
-          'updatedAt': t,
-          'deletedAt': null,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await d.insert('pots', {
+        'id': '${b.id}_pot_$i',
+        'batchId': b.id,
+        'idx': i,
+        'state': 'alive',
+        'note': '',
+        'changedAt': '',
+        'rev': 1,
+        'createdAt': t,
+        'updatedAt': t,
+        'deletedAt': null,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
     // 只停用「当前总数之外」的盆；中间缺号（盆 3 删了）保留
     for (var i = target + 1; i <= maxIdx; i++) {
@@ -742,21 +749,12 @@ class Repo {
     }
   }
 
-  Future<void> setPotState(
-    Pot pot,
-    String state, {
-    String note = '',
-  }) async {
+  Future<void> setPotState(Pot pot, String state, {String note = ''}) async {
     final d = await _d;
     final t = nowStamp();
     await d.update(
       'pots',
-      {
-        'state': state,
-        'note': note,
-        'changedAt': todayStr(),
-        'updatedAt': t,
-      },
+      {'state': state, 'note': note, 'changedAt': todayStr(), 'updatedAt': t},
       where: 'id = ?',
       whereArgs: [pot.id],
     );
@@ -1051,10 +1049,7 @@ class Repo {
     final batches = <Map<String, String>>[];
     for (final r in items) {
       if (seen.add(r.batchId)) {
-        batches.add({
-          'id': r.batchId,
-          'name': names[r.batchId] ?? '未命名批次',
-        });
+        batches.add({'id': r.batchId, 'name': names[r.batchId] ?? '未命名批次'});
       }
     }
     final head = items.first;
@@ -1071,7 +1066,10 @@ class Repo {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<List<ReminderLog>> reminderLogs({int limit = 50, int offset = 0}) async {
+  Future<List<ReminderLog>> reminderLogs({
+    int limit = 50,
+    int offset = 0,
+  }) async {
     final d = await _d;
     final rows = await d.query(
       'reminder_logs',
@@ -1123,6 +1121,14 @@ class Repo {
         : (parseDay(b.stuntedSince) ?? now);
     final base = batchBaseDate(b, today: now);
     return daysBetween(base, anchor) + 1 - b.growthOffsetDays;
+  }
+
+  /// 日历苗龄：从定植日 / 萌芽日算起，不含生长偏移；仅用于界面展示。
+  int plantedDays(Batch b, {DateTime? today}) {
+    final now = dateOnly(today ?? DateTime.now());
+    final base = batchBaseDate(b, today: now);
+    final n = daysBetween(base, now) + 1;
+    return n < 1 ? 1 : n; // 定植日在未来时不显示 0 / 负数
   }
 
   Future<StageSnapshot> snapshot(Batch b, {DateTime? today}) async {
@@ -1274,7 +1280,9 @@ class Repo {
     int limit = 200,
   }) async {
     final d = await _d;
-    final from = fmtDay(dateOnly(DateTime.now().subtract(Duration(days: days - 1))));
+    final from = fmtDay(
+      dateOnly(DateTime.now().subtract(Duration(days: days - 1))),
+    );
     final rows = await d.query(
       'records',
       where: photo
@@ -1296,8 +1304,7 @@ class Repo {
       where: 'deletedAt IS NULL',
     );
     return {
-      for (final r in rows)
-        r['id'] as String: (r['name'] ?? '').toString(),
+      for (final r in rows) r['id'] as String: (r['name'] ?? '').toString(),
     };
   }
 

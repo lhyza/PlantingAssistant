@@ -9,7 +9,6 @@ import '../data/repo.dart';
 import '../data/update_controller.dart';
 import 'app_state.dart';
 import 'batch_detail.dart';
-import 'batch_list.dart';
 import 'image_tile.dart';
 import 'record_list.dart';
 import 'reminder_sheet.dart';
@@ -56,8 +55,7 @@ class _TodayPageState extends State<TodayPage> {
     var sel = cropId;
     if (sel.isEmpty) {
       final saved = await repo.setting('ui.todayCrop');
-      final ok =
-          saved == kTodayAll || cs.any((c) => c.id == saved);
+      final ok = saved == kTodayAll || cs.any((c) => c.id == saved);
       sel = ok ? saved! : (def?.id ?? '');
     }
     final allMode = sel == kTodayAll;
@@ -103,9 +101,7 @@ class _TodayPageState extends State<TodayPage> {
   }
 
   List<ReminderGroup> get overdue => groups
-      .where(
-        (g) => g.dueAt.isNotEmpty && g.dueAt.compareTo(todayStr()) < 0,
-      )
+      .where((g) => g.dueAt.isNotEmpty && g.dueAt.compareTo(todayStr()) < 0)
       .toList();
 
   List<ReminderGroup> get dueToday =>
@@ -433,13 +429,6 @@ class _TodayPageState extends State<TodayPage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (stage != null)
-                  Pill(
-                    '第 ${s!.dayInStage}/${stage.days} 天',
-                    bg: Colors.white,
-                    fg: kGreen,
-                    border: kGreen.withValues(alpha: 0.25),
-                  ),
               ],
             ),
             const SizedBox(height: 3),
@@ -447,7 +436,9 @@ class _TodayPageState extends State<TodayPage> {
               children: [
                 Expanded(
                   child: Text(
-                    stage == null ? '还没有配置阶段' : stage.name,
+                    stage == null
+                        ? '还没有配置阶段'
+                        : '${stage.name}${s?.dayInStage ?? 0}/${stage.days}',
                     style: const TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w700,
@@ -594,7 +585,7 @@ class _TodayPageState extends State<TodayPage> {
                       Row(
                         children: [
                           Pill(
-                            '${s?.dayInCycle ?? 0} 天',
+                            '${repo.plantedDays(b)}天',
                             bg: const Color(0xFFF5F3F0),
                             fg: kInk2,
                           ),
@@ -607,7 +598,11 @@ class _TodayPageState extends State<TodayPage> {
                           const SizedBox(width: 6),
                           if (stage != null)
                             Flexible(
-                              child: Pill(stage.name, bg: kGreenBg, fg: kGreen),
+                              child: Pill(
+                                '${stage.name}${s?.dayInStage ?? 0}/${stage.days}',
+                                bg: kGreenBg,
+                                fg: kGreen,
+                              ),
                             ),
                         ],
                       ),
@@ -657,10 +652,7 @@ class _TodayPageState extends State<TodayPage> {
                 ),
               ),
             ),
-            child: OpRecordTile(
-              records: map[k]!,
-              batchNames: batchNames,
-            ),
+            child: OpRecordTile(records: map[k]!, batchNames: batchNames),
           ),
         ),
     ];
@@ -758,11 +750,7 @@ class _TodayPageState extends State<TodayPage> {
                       maxLines: 2,
                     ),
                     if (g.isGroup)
-                      Text(
-                        '批次：${_groupBatches(g)}',
-                        style: tSub,
-                        maxLines: 2,
-                      ),
+                      Text('批次：${_groupBatches(g)}', style: tSub, maxLines: 2),
                   ],
                 ),
               ),

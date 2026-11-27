@@ -259,7 +259,8 @@ Future<void> quickRecord(BuildContext context) async {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (batches.any((b) => !picked.contains(b.id)))
+                        if (showSkippedRecords.value &&
+                            batches.any((b) => !picked.contains(b.id)))
                           Text(
                             '未施 ${batches.where((b) => !picked.contains(b.id)).length} 个批次：'
                             '${batches.where((b) => !picked.contains(b.id)).map((b) => b.name).join('、')}',
@@ -325,10 +326,22 @@ class RecordEditPage extends StatefulWidget {
     required this.batchIds,
     this.type = '施肥',
     this.recordId,
+    this.date,
+    this.title,
+    this.fromReminder = '',
   });
   final List<String> batchIds;
   final String type;
   final String? recordId;
+
+  /// 预填日期（记一笔从提醒完成页进入时用）
+  final String? date;
+
+  /// 预填标题（提醒标题）
+  final String? title;
+
+  /// 非空表示由提醒完成带入，返回时若没保存要二次确认
+  final String fromReminder;
   @override
   State<RecordEditPage> createState() => _RecordEditPageState();
 }
@@ -345,6 +358,8 @@ class _RecordEditPageState extends State<RecordEditPage> {
   List<String> photos = [];
   GardenRecord? origin;
   bool loading = true;
+  bool _saved = false;
+  bool _leaving = false;
 
   int imgW = 0;
   int imgH = 0;
@@ -366,6 +381,7 @@ class _RecordEditPageState extends State<RecordEditPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.date != null && widget.date!.isNotEmpty) date = widget.date!;
     _load();
   }
 
@@ -431,7 +447,8 @@ class _RecordEditPageState extends State<RecordEditPage> {
         }
       }
     } else {
-      _title.text = _defaultTitle(type);
+      final t = widget.title?.trim() ?? '';
+      _title.text = t.isNotEmpty ? t : _defaultTitle(type);
     }
     if (!mounted) return;
     setState(() => loading = false);
@@ -475,6 +492,7 @@ class _RecordEditPageState extends State<RecordEditPage> {
       await repo.saveRecord(r);
       bump();
       if (!mounted) return;
+      _saved = true;
       Navigator.pop(context, r);
       return;
     }
@@ -497,6 +515,7 @@ class _RecordEditPageState extends State<RecordEditPage> {
     }
     bump();
     if (!mounted) return;
+    _saved = true;
     Navigator.pop(context, last);
   }
 
@@ -533,11 +552,8 @@ class _RecordEditPageState extends State<RecordEditPage> {
 
   Future<void> _pickMaterial(_PRow row) async {
     final cropIds = batchList.map((b) => b.crop).toSet();
-    bool allowed(Supply m) =>
-        !cropIds.any((c) => m.blockedFor(c));
-    final fers = (await repo.materials('fertilizer'))
-        .where(allowed)
-        .toList();
+    bool allowed(Supply m) => !cropIds.any((c) => m.blockedFor(c));
+    final fers = (await repo.materials('fertilizer')).where(allowed).toList();
     final meds = (await repo.materials('medicine')).where(allowed).toList();
     if (!mounted) return;
     if (fers.isEmpty && meds.isEmpty) {
@@ -782,9 +798,7 @@ class _RecordEditPageState extends State<RecordEditPage> {
                   decoration: BoxDecoration(
                     color: p.dead
                         ? const Color(0xFFF3F2F0)
-                        : (photoCounts.containsKey(p.idx)
-                              ? kGreenBg
-                              : kRedBg),
+                        : (photoCounts.containsKey(p.idx) ? kGreenBg : kRedBg),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: potSel == p.idx
@@ -804,7 +818,9 @@ class _RecordEditPageState extends State<RecordEditPage> {
                       fontWeight: FontWeight.w700,
                       color: p.dead
                           ? kInk3
-                          : (photoCounts.containsKey(p.idx) ? kGreen : kRedDeep),
+                          : (photoCounts.containsKey(p.idx)
+                                ? kGreen
+                                : kRedDeep),
                     ),
                   ),
                 ),
@@ -862,7 +878,11 @@ class _RecordEditPageState extends State<RecordEditPage> {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(14),
-          child: LocalImage(ref: photos.first, width: double.infinity, height: 210),
+          child: LocalImage(
+            ref: photos.first,
+            width: double.infinity,
+            height: 210,
+          ),
         ),
         const SizedBox(height: 8),
         TextButton.icon(
@@ -877,96 +897,128 @@ class _RecordEditPageState extends State<RecordEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.recordId == null ? '记一笔' : '编辑记录'),
-        actions: [
-          TextButton(
-            onPressed: loading ? null : _save,
-            child: const Text(
-              '保存',
-              style: TextStyle(fontWeight: FontWeight.w700),
+    return PopScope(
+      canPop: widget.fromReminder.isEmpty || _saved || _leaving,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final ok = await confirm(
+          context,
+          '还没添加操作记录',
+          body: '完成提醒后建议补一条操作记录，记录会更完整。仍要退出吗？',
+          ok: '退出',
+          danger: false,
+        );
+        if (!ok || !mounted) return;
+        setState(() => _leaving = true);
+        Navigator.pop(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.recordId == null ? '记一笔' : '编辑记录'),
+          actions: [
+            TextButton(
+              onPressed: loading ? null : _save,
+              child: const Text(
+                '保存',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
-          ),
-        ],
-      ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator(color: kRed))
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 40),
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(_names, style: tSub)),
-                    if (widget.recordId == null && batchList.length > 1)
-                      Pill('${batchList.length} 个批次', bg: kRedBg, fg: kRedDeep),
-                  ],
-                ),
-                const FormLabel('类型'),
-                ChoiceRow(
-                  options: kRecordTypes,
-                  value: type,
-                  onChanged: (v) async {
-                    setState(() {
-                      type = v;
-                      if (_title.text == _defaultTitle(type) ||
-                          _title.text.isEmpty ||
-                          true) {
-                        _title.text = _defaultTitle(v);
-                      }
-                    });
-                    if (v == '拍照') await _ensurePots();
-                  },
-                ),
-                if (_isPhoto) ...[
-                  if (_byPot) _potPicker(),
-                  const FormLabel('照片', required: true),
-                  _photoBox(),
-                ] else ...[
-                  const FormLabel('日期'),
-                  PickTile(
-                    label: '',
-                    value: date,
-                    onTap: () async {
-                      final d = await pickDate(
-                        context,
-                        parseDay(date) ?? DateTime.now(),
-                      );
-                      if (d != null) setState(() => date = fmtDay(d));
-                    },
-                  ),
-                  const FormLabel('标题'),
-                  TextField(
-                    controller: _title,
-                    decoration: const InputDecoration(hintText: '做了什么'),
-                  ),
-                  if (_showProducts) ...[
-                    const FormLabel('产品'),
-                    ...List.generate(rows.length, _productRow),
-                    TextButton.icon(
-                      onPressed: () => setState(() => rows.add(_PRow())),
-                      icon: const Icon(Icons.add, size: 17),
-                      label: const Text('添加一项（复配）'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: kRed,
-                        visualDensity: VisualDensity.compact,
+          ],
+        ),
+        body: loading
+            ? const Center(child: CircularProgressIndicator(color: kRed))
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 40),
+                children: [
+                  if (widget.fromReminder.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      decoration: cardDeco(color: kGreenBg),
+                      child: Text(
+                        '由提醒「${widget.fromReminder}」带入，类型、日期、批次已填好，请补充产品和用量。',
+                        style: tSub.copyWith(color: kGreen, height: 1.5),
                       ),
                     ),
-                  ],
-                ],
-                const FormLabel('备注'),
-                AutoField(controller: _notes, hint: '植株反应、天气、下次注意…'),
-                const SizedBox(height: 22),
-                FilledButton(
-                  onPressed: _canSave ? _save : null,
-                  child: Text(
-                    widget.recordId == null && batchList.length > 1
-                        ? '保存 ${batchList.length} 条记录'
-                        : '保存记录',
+                  Row(
+                    children: [
+                      Expanded(child: Text(_names, style: tSub)),
+                      if (widget.recordId == null && batchList.length > 1)
+                        Pill(
+                          '${batchList.length} 个批次',
+                          bg: kRedBg,
+                          fg: kRedDeep,
+                        ),
+                    ],
                   ),
-                ),
-              ],
-            ),
+                  const FormLabel('类型'),
+                  ChoiceRow(
+                    options: kRecordTypes,
+                    value: type,
+                    onChanged: (v) async {
+                      setState(() {
+                        final oldDefault = _defaultTitle(type);
+                        final cur = _title.text.trim();
+                        type = v;
+                        // 只替换「还是上一个类型的默认标题」的情况，
+                        // 提醒带入的标题、用户手填的标题都保留。
+                        if (cur.isEmpty || cur == oldDefault) {
+                          _title.text = _defaultTitle(v);
+                        }
+                      });
+                      if (v == '拍照') await _ensurePots();
+                    },
+                  ),
+                  if (_isPhoto) ...[
+                    if (_byPot) _potPicker(),
+                    const FormLabel('照片', required: true),
+                    _photoBox(),
+                  ] else ...[
+                    const FormLabel('日期'),
+                    PickTile(
+                      label: '',
+                      value: date,
+                      onTap: () async {
+                        final d = await pickDate(
+                          context,
+                          parseDay(date) ?? DateTime.now(),
+                        );
+                        if (d != null) setState(() => date = fmtDay(d));
+                      },
+                    ),
+                    const FormLabel('标题'),
+                    TextField(
+                      controller: _title,
+                      decoration: const InputDecoration(hintText: '做了什么'),
+                    ),
+                    if (_showProducts) ...[
+                      const FormLabel('产品'),
+                      ...List.generate(rows.length, _productRow),
+                      TextButton.icon(
+                        onPressed: () => setState(() => rows.add(_PRow())),
+                        icon: const Icon(Icons.add, size: 17),
+                        label: const Text('添加一项（复配）'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: kRed,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
+                  ],
+                  const FormLabel('备注'),
+                  AutoField(controller: _notes, hint: '植株反应、天气、下次注意…'),
+                  const SizedBox(height: 22),
+                  FilledButton(
+                    onPressed: _canSave ? _save : null,
+                    child: Text(
+                      widget.recordId == null && batchList.length > 1
+                          ? '保存 ${batchList.length} 条记录'
+                          : '保存记录',
+                    ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }

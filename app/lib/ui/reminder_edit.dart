@@ -11,83 +11,7 @@ import 'image_tile.dart';
 import 'record_edit.dart' show kindEmojiOf;
 
 /// 完成一次提醒：选择完成日期 → 滚动到下次到期
-Future<void> finishReminder(BuildContext context, Reminder r) async {
-  if (!r.active) {
-    await toast(context, '这条提醒已经结束了');
-    return;
-  }
-  var done = DateTime.now();
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx2, setD) => AlertDialog(
-        title: Text(
-          r.title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('完成日期', style: tSub),
-            const SizedBox(height: 6),
-            InkWell(
-              onTap: () async {
-                final d = await pickDate(ctx2, done);
-                if (d != null) setD(() => done = d);
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: kLine),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(fmtDay(done), style: const TextStyle(fontSize: 14)),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              r.isOneTime
-                  ? '这是一次性提醒，完成后会结束。'
-                  : '完成后，下次到期日 = ${fmtDay(done)} + ${r.intervalDays} 天。',
-              style: tTiny,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx2, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx2, true),
-            child: const Text(
-              '完成',
-              style: TextStyle(fontWeight: FontWeight.w700, color: kGreen),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-  if (ok != true) return;
-  await Repo.instance.completeReminder(r, doneAt: done);
-  await Repo.instance.logReminderDone(
-    items: [r],
-    done: done,
-    nextDueAt: r.isOneTime ? '' : r.nextDueAt,
-  );
-  await Notify.instance.reschedule();
-  bump();
-  if (context.mounted) {
-    toast(context, r.isOneTime ? '已完成' : '完成，下次 ${r.nextDueAt}');
-  }
-}
-
+/// 已统一收敛到 reminder_sheet.dart 的 openCompleteReminder。
 class ReminderEditPage extends StatefulWidget {
   const ReminderEditPage({
     super.key,
@@ -247,9 +171,7 @@ class _ReminderEditPageState extends State<ReminderEditPage> {
     Navigator.pop(context, true);
     await toast(
       context,
-      isNew && selected.length > 1
-          ? '已为 ${selected.length} 个批次创建提醒'
-          : '已保存',
+      isNew && selected.length > 1 ? '已为 ${selected.length} 个批次创建提醒' : '已保存',
     );
   }
 
@@ -397,7 +319,9 @@ class _ReminderEditPageState extends State<ReminderEditPage> {
   }
 
   Widget _batchFixed() {
-    final list = isGroup ? groupItems : (origin == null ? <Reminder>[] : [origin!]);
+    final list = isGroup
+        ? groupItems
+        : (origin == null ? <Reminder>[] : [origin!]);
     final names = <String>[];
     for (final r in list) {
       for (final b in batches) {
