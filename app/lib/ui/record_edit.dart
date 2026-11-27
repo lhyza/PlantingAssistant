@@ -352,6 +352,9 @@ class _RecordEditPageState extends State<RecordEditPage> {
   final _notes = TextEditingController();
   late String type = widget.type;
   String date = todayStr();
+
+  /// 本次操作的施用方式（整条记录只有一个）
+  String opMethod = '';
   final Map<String, String> stageIds = {};
   List<Batch> batchList = [];
   final List<_PRow> rows = [_PRow()];
@@ -377,6 +380,42 @@ class _RecordEditPageState extends State<RecordEditPage> {
   bool get _showProducts => type == '施肥' || type == '施药';
   bool get _isPhoto => type == '拍照';
   bool get _canSave => !_isPhoto || photos.isNotEmpty;
+
+  /// 有「支持方式」信息的产品；手填产品不限制方式。
+  List<List<String>> get _knownSupport =>
+      rows.map((r) => r.supported).where((s) => s.isNotEmpty).toList();
+
+  /// 各产品支持方式没有交集时需要提示。
+  bool get _noCommonMethod {
+    final known = _knownSupport;
+    if (known.length < 2) return false;
+    var inter = known.first.toSet();
+    for (final s in known.skip(1)) {
+      inter = inter.intersection(s.toSet());
+    }
+    return inter.isEmpty;
+  }
+
+  /// 本次可选方式：有信息的产品取交集，无交集时退回并集。
+  List<String> get _methodOptions {
+    final known = _knownSupport;
+    if (known.isEmpty) return [...Supply.kMethods];
+    var inter = known.first.toSet();
+    for (final s in known.skip(1)) {
+      inter = inter.intersection(s.toSet());
+    }
+    final set = inter.isNotEmpty ? inter : {for (final s in known) ...s};
+    final list = Supply.kMethods.where(set.contains).toList();
+    return list.isEmpty ? [...Supply.kMethods] : list;
+  }
+
+  /// 支持信息变化后校正当前值：不在可选集就自动选第一个；
+  /// 完全没有支持信息时不预选（保存时要求手动选）。
+  void _syncMethod() {
+    final opts = _methodOptions;
+    if (opts.contains(opMethod)) return;
+    opMethod = _knownSupport.isEmpty || opts.isEmpty ? '' : opts.first;
+  }
 
   @override
   void initState() {
@@ -425,6 +464,7 @@ class _RecordEditPageState extends State<RecordEditPage> {
         imgW = origin!.imgW;
         imgH = origin!.imgH;
         potSel = origin!.potIndex;
+        opMethod = origin!.effMethod;
         if (origin!.type != '拍照') {
           final list = origin!.products.isNotEmpty
               ? origin!.products
@@ -478,12 +518,17 @@ class _RecordEditPageState extends State<RecordEditPage> {
           (e) => RecordProduct(
             name: e.data.name.trim(),
             dosage: e.data.dosage.trim(),
-            method: e.data.method,
-            methods: e.data.effMethods,
+            method: opMethod,
+            methods: opMethod.isEmpty ? const [] : [opMethod],
           ),
         )
         .where((e) => e.name.isNotEmpty || e.dosage.isNotEmpty)
         .toList();
+    // 有产品时必须选一个本次施用方式（复配只能混成一种方式）
+    if (_showProducts && items.isNotEmpty && opMethod.isEmpty) {
+      toast(context, '请选择本次施用方式');
+      return;
+    }
 
     if (widget.recordId != null && origin != null) {
       final r = origin!;
@@ -542,7 +587,7 @@ class _RecordEditPageState extends State<RecordEditPage> {
     r.products = _isPhoto ? const [] : items;
     r.productName = (_isPhoto || items.isEmpty) ? '' : items.first.name;
     r.dosage = (_isPhoto || items.isEmpty) ? '' : items.first.dosage;
-    r.method = (_isPhoto || items.isEmpty) ? '' : items.first.method;
+    r.method = (_isPhoto || items.isEmpty) ? '' : opMethod;
     r.potIndex = _byPot ? potSel : 0;
     r.imgW = imgW;
     r.imgH = imgH;
@@ -616,14 +661,14 @@ class _RecordEditPageState extends State<RecordEditPage> {
                           onTap: () {
                             row.data.name = m.name;
                             row.data.dosage = m.ratio;
-                            row.data.methods = m.effMethods;
-                            row.data.method = m.effMethods.isEmpty
-                                ? m.method
-                                : m.effMethods.first;
+                            row.data.method = '';
+                            row.data.methods = [];
+                            row.supported = [...m.effMethods];
+                            row.pickedName = m.name;
                             row.name.text = m.name;
                             row.dosage.text = m.ratio;
                             Navigator.pop(ctx);
-                            setState(() {});
+                            setState(_syncMethod);
                           },
                         ),
                       ),
@@ -661,6 +706,7 @@ class _RecordEditPageState extends State<RecordEditPage> {
                 GestureDetector(
                   onTap: () => setState(() {
                     rows.removeAt(i).dispose();
+                    _syncMethod();
                   }),
                   child: const Icon(Icons.close, size: 17, color: kInk3),
                 ),
@@ -676,7 +722,17 @@ class _RecordEditPageState extends State<RecordEditPage> {
                     hintText: type == '施肥' ? '花多多 2 号' : '代森锰锌',
                     isDense: true,
                   ),
-                  onChanged: (v) => row.data.name = v,
+                  onChanged: (v) {
+                    row.data.name = v;
+                    // 手改名称后，从库里带出的「支持方式」不再可信
+                    if (row.pickedName.isNotEmpty && v != row.pickedName) {
+                      setState(() {
+                        row.supported.clear();
+                        row.pickedName = '';
+                        _syncMethod();
+                      });
+                    }
+                  },
                 ),
               ),
               IconButton(
@@ -701,44 +757,10 @@ class _RecordEditPageState extends State<RecordEditPage> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: Supply.kMethods.map((m) {
-              final on = row.data.effMethods.contains(m);
-              return GestureDetector(
-                onTap: () => setState(() {
-                  final next = [...row.data.effMethods];
-                  if (on) {
-                    next.remove(m);
-                  } else {
-                    next.add(m);
-                  }
-                  row.data.methods = next;
-                  row.data.method = next.isEmpty ? '' : next.first;
-                }),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: on ? kGreenBg : Colors.white,
-                    borderRadius: BorderRadius.circular(9),
-                    border: Border.all(color: on ? kGreen : kLine),
-                  ),
-                  child: Text(
-                    m,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: on ? kGreen : kInk3,
-                      fontWeight: on ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+          const SizedBox(height: 6),
+          Text(
+            row.supported.isEmpty ? '支持：未填' : '支持：${row.supported.join(' · ')}',
+            style: tTiny.copyWith(color: kInk3),
           ),
         ],
       ),
@@ -1003,6 +1025,20 @@ class _RecordEditPageState extends State<RecordEditPage> {
                           visualDensity: VisualDensity.compact,
                         ),
                       ),
+                      const FormLabel('本次施用方式'),
+                      ChoiceRow(
+                        options: _methodOptions,
+                        value: opMethod,
+                        onChanged: (v) => setState(() => opMethod = v),
+                      ),
+                      if (_noCommonMethod)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            '这些产品没有共同支持的施用方式，请确认。',
+                            style: tTiny.copyWith(color: kAmber),
+                          ),
+                        ),
                     ],
                   ],
                   const FormLabel('备注'),
@@ -1042,6 +1078,12 @@ class _PRow {
   RecordProduct data;
   late final TextEditingController name;
   late final TextEditingController dosage;
+
+  /// 从知识库带出的「支持方式」；空 = 未填（不限制）。
+  List<String> supported = [];
+
+  /// 从知识库选中的名称；手改名称后清空支持方式。
+  String pickedName = '';
 
   void dispose() {
     name.dispose();

@@ -460,13 +460,7 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
                   child: Row(
                     children: [
                       Expanded(child: Text(p.name, style: tBody)),
-                      Text(
-                        [
-                          p.dosage,
-                          p.method,
-                        ].where((x) => x.isNotEmpty).join(' · '),
-                        style: tSub,
-                      ),
+                      Text(p.dosage, style: tSub),
                     ],
                   ),
                 ),
@@ -474,13 +468,13 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
           ] else if (r.productName.isNotEmpty) ...[
             const SectionTitle('产品'),
             Text(
-              [
-                r.productName,
-                r.dosage,
-                r.method,
-              ].where((x) => x.isNotEmpty).join(' · '),
+              [r.productName, r.dosage].where((x) => x.isNotEmpty).join(' · '),
               style: tBody,
             ),
+          ],
+          if (r.effMethod.isNotEmpty) ...[
+            const SectionTitle('施用方式'),
+            Text(r.effMethod, style: tBody),
           ],
           if (r.notes.isNotEmpty) ...[
             const SectionTitle('备注'),
@@ -522,6 +516,20 @@ class _RecordDetailPageState extends State<RecordDetailPage> {
           : null,
     );
   }
+}
+
+/// 操作记录列表里「产品 用量 ＋ … · 本次施用方式」的文案。
+/// 施用方式整条记录只出现一次。
+String productSummary(GardenRecord r) {
+  final m = r.effMethod;
+  final base = r.products.isNotEmpty
+      ? r.products
+            .map((p) => [p.name, p.dosage].where((x) => x.isNotEmpty).join(' '))
+            .where((e) => e.isNotEmpty)
+            .join(' ＋ ')
+      : [r.productName, r.dosage].where((x) => x.isNotEmpty).join(' ');
+  if (base.isEmpty) return m;
+  return m.isEmpty ? base : '$base · $m';
 }
 
 /// 列表里复用的记录卡片（操作记录与批次详情共用）。
@@ -585,29 +593,8 @@ class RecordTile extends StatelessWidget {
                     Text(r.date, style: tTiny),
                   ],
                 ),
-                if (r.products.isNotEmpty)
-                  Text(
-                    r.products
-                        .map(
-                          (e) => [
-                            e.name,
-                            e.dosage,
-                            e.methodsText.isEmpty ? e.method : e.methodsText,
-                          ].where((x) => x.isNotEmpty).join(' '),
-                        )
-                        .where((e) => e.isNotEmpty)
-                        .join(' ＋ '),
-                    style: tSub,
-                  )
-                else if (r.productName.isNotEmpty)
-                  Text(
-                    [
-                      r.productName,
-                      r.dosage,
-                      r.method,
-                    ].where((e) => e.isNotEmpty).join(' · '),
-                    style: tSub,
-                  ),
+                if (r.products.isNotEmpty || r.productName.isNotEmpty)
+                  Text(productSummary(r), style: tSub),
                 if (r.notes.isNotEmpty)
                   Text(
                     r.notes,
@@ -690,30 +677,12 @@ class OpRecordTile extends StatelessWidget {
                       Text(r.date, style: tTiny),
                     ],
                   ),
-                  if (r.products.isNotEmpty)
+                  if (r.products.isNotEmpty || r.productName.isNotEmpty)
                     Text(
-                      r.products
-                          .map(
-                            (e) => [
-                              e.name,
-                              e.dosage,
-                              e.methodsText.isEmpty ? e.method : e.methodsText,
-                            ].where((x) => x.isNotEmpty).join(' '),
-                          )
-                          .where((e) => e.isNotEmpty)
-                          .join(' ＋ '),
+                      productSummary(r),
                       style: tSub,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                    )
-                  else if (r.productName.isNotEmpty)
-                    Text(
-                      [
-                        r.productName,
-                        r.dosage,
-                        r.method,
-                      ].where((e) => e.isNotEmpty).join(' · '),
-                      style: tSub,
                     ),
                   if (r.notes.isNotEmpty)
                     Text(

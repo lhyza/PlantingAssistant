@@ -14,6 +14,7 @@ class CropSeason {
     name: (m['name'] ?? '').toString(),
     start: (m['start'] ?? '').toString(),
   );
+
   /// 解析 JSON 字符串或 List（兼容种子文件与 DB）
   static List<CropSeason> parse(dynamic v) {
     dynamic raw = v;
@@ -706,6 +707,18 @@ class GardenRecord {
 
   /// v1.7：这次没有勾选的批次 id 快照（「未施」名单）
   List<String> opSkipped;
+
+  /// 本次操作的施用方式：优先记录级，旧记录回落到第一个产品的方式。
+  String get effMethod {
+    final m = method.trim();
+    if (m.isNotEmpty) return m;
+    for (final p in products) {
+      final pm = p.effMethods;
+      if (pm.isNotEmpty) return pm.first;
+    }
+    return '';
+  }
+
   int rev;
   String createdAt;
   String updatedAt;
@@ -1112,12 +1125,7 @@ class Pot {
 
 /// 一批的盆状态汇总。
 class PotStats {
-  PotStats({
-    this.alive = 0,
-    this.stunted = 0,
-    this.dead = 0,
-    this.total = 0,
-  });
+  PotStats({this.alive = 0, this.stunted = 0, this.dead = 0, this.total = 0});
   int alive;
   int stunted;
   int dead;
@@ -1132,7 +1140,6 @@ class PotStats {
     return parts.join(' · ');
   }
 }
-
 
 String? _jsonList(List<String> v) => jsonEncode(v);
 
@@ -1183,16 +1190,16 @@ class ReminderLog {
   bool get isOneTime => nextDueAt.isEmpty;
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'groupId': groupId,
-        'kind': kind,
-        'title': title,
-        'notes': notes,
-        'doneAt': doneAt,
-        'nextDueAt': nextDueAt,
-        'batches': batches,
-        'createdAt': createdAt,
-      };
+    'id': id,
+    'groupId': groupId,
+    'kind': kind,
+    'title': title,
+    'notes': notes,
+    'doneAt': doneAt,
+    'nextDueAt': nextDueAt,
+    'batches': batches,
+    'createdAt': createdAt,
+  };
 
   static List<Map<String, String>> batchesOf(dynamic v) {
     if (v is List) {
@@ -1217,15 +1224,14 @@ class ReminderLog {
   }
 
   factory ReminderLog.fromMap(Map<String, dynamic> m) => ReminderLog(
-        id: (m['id'] ?? '').toString(),
-        groupId: (m['groupId'] ?? '').toString(),
-        kind: (m['kind'] ?? '其他').toString(),
-        title: (m['title'] ?? '').toString(),
-        notes: (m['notes'] ?? '').toString(),
-        doneAt: (m['doneAt'] ?? '').toString(),
-        nextDueAt: (m['nextDueAt'] ?? '').toString(),
-        batches: batchesOf(m['batches']),
-        createdAt: (m['createdAt'] ?? '').toString(),
-      );
+    id: (m['id'] ?? '').toString(),
+    groupId: (m['groupId'] ?? '').toString(),
+    kind: (m['kind'] ?? '其他').toString(),
+    title: (m['title'] ?? '').toString(),
+    notes: (m['notes'] ?? '').toString(),
+    doneAt: (m['doneAt'] ?? '').toString(),
+    nextDueAt: (m['nextDueAt'] ?? '').toString(),
+    batches: batchesOf(m['batches']),
+    createdAt: (m['createdAt'] ?? '').toString(),
+  );
 }
-

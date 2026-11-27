@@ -18,6 +18,18 @@ class AppRelease {
 /// 从新到旧排列。发布新版本时在最前面插入一条。
 const List<AppRelease> kChangelog = [
   AppRelease(
+    version: '2.0.8',
+    date: '2026-11-27',
+    highlights: ['复配只选一种施用方式', '记录列表更清爽'],
+    items: [
+      '记一笔里产品只展示「支持的方式」，不再每个产品各选一遍',
+      '复配时整条记录只选一个施用方式，默认取第一个产品支持的第一个',
+      '各产品支持方式没有交集时会提示，并按并集列出可选方式',
+      '操作记录列表里方式只显示一次，详情页单独一行「施用方式」',
+      '旧记录仍按记录级方式正常显示',
+    ],
+  ),
+  AppRelease(
     version: '2.0.7',
     date: '2026-11-27',
     highlights: ['完成提醒一步到位', '未施可隐藏', '批次天数按定植算'],
@@ -61,9 +73,7 @@ const List<AppRelease> kChangelog = [
     version: '2.0.3',
     date: '2026-11-26',
     highlights: ['提醒历史：完成过的都留档'],
-    items: [
-      '「近 15 天提醒」右侧固定一个「历史 ›」，点开看所有已完成的提醒，提醒可删除',
-    ],
+    items: ['「近 15 天提醒」右侧固定一个「历史 ›」，点开看所有已完成的提醒，提醒可删除'],
   ),
   AppRelease(
     version: '2.0.2',
@@ -144,9 +154,7 @@ const List<AppRelease> kChangelog = [
     version: '1.8.3',
     date: '2026-11-24',
     highlights: ['操作记录可删除'],
-    items: [
-      '操作记录详情页右上角新增「删除」',
-    ],
+    items: ['操作记录详情页右上角新增「删除」'],
   ),
   AppRelease(
     version: '1.8.2',
